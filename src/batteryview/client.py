@@ -7,14 +7,37 @@ import os
 import re
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import asdict, replace
+from dataclasses import asdict, fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .collection import collect
-from .errors import BatteryViewError, ProtocolError, ResetRecoveryError, UnsupportedCommand
-from .models import CollectionResult, DeviceInfo, ReportResult, Snapshot
-from .parsers import parse_getpwr, parse_info, parse_pwr, recommended_currents, record_count
+from .diagnostics import command_label
+from .errors import (
+    BatteryViewError,
+    CommandTimeout,
+    ConnectionError,
+    ProtocolError,
+    ResetRecoveryError,
+    UnsupportedCommand,
+)
+from .models import (
+    CollectionResult,
+    DeviceInfo,
+    ModuleReading,
+    ReportResult,
+    Snapshot,
+    SystemReading,
+)
+from .parsers import (
+    parse_getpwr,
+    parse_info,
+    parse_pwr,
+    parse_recommended_currents,
+    record_count,
+    record_indices,
+)
+from .profiles import monitoring_profile
 from .protocol import ConsoleSession, Response
 from .transcript import TranscriptWriter, report_filename
 from .transport import SerialTransport
@@ -33,6 +56,9 @@ class BatteryClient:
         module: int | None = None,
         shift: bool = True,
         session: ConsoleSession | None = None,
+        monitoring_mode: str = "auto",
+        profile: str | None = None,
+        read_retries: int = 0,
     ):
         if module is not None and not 1 <= module <= 16:
             raise ValueError("Module must be between 1 and 16")
@@ -40,6 +66,17 @@ class BatteryClient:
             raise ValueError("Timeout must be finite and positive; baud rate must be positive")
         if session is None and not port:
             raise ValueError("A serial port or session is required")
+        if monitoring_mode not in {"auto", "single", "parallel"}:
+            raise ValueError("Monitoring mode must be auto, single or parallel")
+        if type(read_retries) is not int or read_retries not in range(3):
+            raise ValueError("Read retries must be 0, 1 or 2")
+        self.monitoring_mode = monitoring_mode
+        if profile is not None:
+            monitoring_profile(profile, explicit=True)
+        self.profile = profile
+        self.read_retries = read_retries
+        self.last_failure: BaseException | None = None
+        self._last_context: dict = {}
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
@@ -61,7 +98,6 @@ class BatteryClient:
         session = ConsoleSession(SerialTransport(self.port, self.baudrate), timeout=self.timeout)
         try:
             session.connect(baudrate=self.baudrate, shift=self.shift)
-            self._select_module(session)
         except BaseException:
             try:
                 session.close()
@@ -70,11 +106,6 @@ class BatteryClient:
             raise
         self._session = session
         return self
-
-    def _select_module(self, session: ConsoleSession) -> None:
-        if self.module is not None:
-            logger.debug("Selecting module=%d", self.module)
-            session.exchange(f"login {self.module} debug")
 
     def close(self) -> None:
         if self._session is not None:
@@ -92,7 +123,8 @@ class BatteryClient:
 
     def info(self) -> DeviceInfo:
         with self.session.lock:
-            self._identity = parse_info(self.session.exchange("info").text)
+            command = f"info {self.module}" if self.module else "info"
+            self._identity = self._parse(parse_info, self._read(command).text, command=command)
             return self._identity
 
     def collect(self, output: str | Path, *, progress: Progress | None = None) -> CollectionResult:
@@ -108,6 +140,53 @@ class BatteryClient:
             return Path(output)
         identity = self._identity or self.info()
         return Path(report_filename(identity.barcode, kind))
+
+    def _parse(self, parser, text: str, *, command: str, **kwargs):
+        try:
+            return parser(text, **kwargs)
+        except ProtocolError as exc:
+            exc.context = {**self._last_context, "command": command_label(command)}
+            raise
+
+    def _read(self, command: str, *, writer: TranscriptWriter | None = None, **kwargs) -> Response:
+        """Retry only explicit read commands, after a verified prompt."""
+        for attempt in range(self.read_retries + 1):
+            try:
+                response = self.session.exchange(command, **kwargs)
+            except ProtocolError as exc:
+                if writer is not None and exc.response:
+                    writer.append(exc.response)
+                if (
+                    not isinstance(exc, (CommandTimeout, ConnectionError))
+                    or attempt == self.read_retries
+                ):
+                    raise
+                logger.debug("Retrying read command=%s attempt=%d", command, attempt + 1)
+                try:
+                    sync = self.session.resynchronize(timeout=max(self.timeout, 15))
+                except ProtocolError as sync_error:
+                    if writer is not None and sync_error.response:
+                        writer.append(sync_error.response)
+                    raise
+                if writer is not None:
+                    writer.append(sync.text)
+                if sync.prompt != "pylon_debug>":
+                    raise ProtocolError(
+                        "Read recovery did not confirm debug prompt", response=sync.text
+                    )
+            else:
+                self._last_context = response.context or {
+                    "command": command_label(command),
+                    "boundary": response.boundary,
+                }
+                if writer is not None:
+                    writer.append(response.text)
+                return response
+        raise AssertionError("unreachable")
+
+    def _direct_only(self, operation: str) -> None:
+        if self.module is not None:
+            raise ValueError(f"{operation} requires a direct module connection; omit --module")
 
     def _record(
         self,
@@ -137,35 +216,113 @@ class BatteryClient:
     def _export(
         self, kind: str, output: str | Path | None, *, progress: Progress | None
     ) -> ReportResult:
+        self._direct_only(kind)
         with self.session.lock:
             path = self._output_path(output, kind)
             with TranscriptWriter(path) as writer:
-                identity = self._record(writer, "info")
+                identity = self._read("info", writer=writer)
                 # A malformed identity must not prevent an otherwise useful raw report.
                 try:
                     self._identity = parse_info(identity.text)
                 except ProtocolError:
                     pass
-                stat = self._record(writer, "stat")
-                count = record_count(stat.text, kind)
-                self._record(writer, f"data {kind}")
-                for offset in range(0, count, 15):
-                    response = self._record(
-                        writer,
-                        f"datalist {kind} dtls {offset}",
-                        paginated=True,
+                stat = self._read("stat", writer=writer)
+                latest = self._read(f"data {kind}", writer=writer)
+                indices = record_indices(latest.text, detailed=True)
+                try:
+                    stat_count = record_count(stat.text, kind)
+                except ProtocolError:
+                    stat_count = None
+                if len(indices) > 1:
+                    raise ProtocolError(
+                        "Latest response has multiple record indices",
+                        response=latest.text,
+                        context=latest.context or {"command": f"data {kind}"},
                     )
+                if indices:
+                    count = indices[0] + 1
+                    if stat_count is not None and stat_count != count:
+                        logger.debug(
+                            "Report count disagreement kind=%s stat=%d latest=%d",
+                            kind,
+                            stat_count,
+                            count,
+                        )
+                elif stat_count is not None:
+                    count = stat_count
+                else:
+                    raise ProtocolError(
+                        "Cannot establish report record count",
+                        response=latest.text,
+                        context=latest.context or {"command": f"data {kind}"},
+                    )
+                verified = set()
+                detailed = True
+                for offset in range(0, count, 15):
+                    if detailed:
+                        try:
+                            page = self._read(
+                                f"datalist {kind} dtls {offset}",
+                                writer=writer,
+                                paginated=True,
+                            )
+                        except UnsupportedCommand:
+                            # The vendor switches modes on an explicit rejection,
+                            # retrying the same block as a plain summary page.
+                            detailed = False
+                            logger.debug(
+                                "Report format fallback kind=%s offset=%d: dtls unsupported; "
+                                "using summary pages and individual records",
+                                kind,
+                                offset,
+                            )
+                    if not detailed:
+                        page = self._read(
+                            f"datalist {kind} {offset}", writer=writer, paginated=True
+                        )
                     # BatteryView sends LF after *every* block, including the last.
                     # On the supplied firmware LF exits pagination; CR+LF continues it.
                     finish = self._record(writer, "", paginated=True)
                     if finish.boundary != "prompt":
                         raise ProtocolError(
-                            "Firmware did not exit detailed pagination after LF; report incomplete"
+                            "Firmware did not exit detailed pagination after LF; report incomplete",
+                            response=finish.text,
+                            context=finish.context or {"command": "<enter>"},
                         )
-                    if response.boundary not in {"page", "prompt"}:
-                        raise ProtocolError("Unexpected detailed report boundary")
-                    if progress:
-                        progress(kind, min(offset + 15, count), count)
+                    if detailed:
+                        received = record_indices(page.text)
+                        expected = list(range(offset, min(offset + 15, count)))
+                        # Some firmware includes the first row of the next page.
+                        overlap = expected + [offset + 15] if offset + 15 < count else expected
+                        if received not in (expected, overlap):
+                            raise ProtocolError(
+                                "Detailed page has missing, repeated or unexpected records; "
+                                "report incomplete",
+                                response=page.text,
+                                context=page.context
+                                or {"command": f"datalist {kind} dtls {offset}"},
+                            )
+                        verified.update(received)
+                        if progress:
+                            progress(kind, len(verified), count)
+                    if not detailed:
+                        for index in range(offset, min(offset + 15, count)):
+                            detail = self._read(
+                                f"data {kind} {index}",
+                                writer=writer,
+                                timeout=max(self.timeout, 10),
+                            )
+                            received = record_indices(detail.text, detailed=True)
+                            if received != [index]:
+                                raise ProtocolError(
+                                    f"Unexpected or missing record index for data {kind} {index}; "
+                                    "report incomplete",
+                                    response=detail.text,
+                                    context=detail.context or {"command": f"data {kind} {index}"},
+                                )
+                            verified.add(index)
+                            if progress:
+                                progress(kind, len(verified), count)
                 if progress and count == 0:
                     progress(kind, 0, 0)
                 return ReportResult(path, kind, count, writer.responses)
@@ -229,6 +386,7 @@ class BatteryClient:
         The recovery JSON is deliberately outside the vendor transcript. An interrupted
         operation raises ResetRecoveryError with the path and last attempted step.
         """
+        self._direct_only("SOC reset")
         with self.session.lock:
             path = self._output_path(output, "resetsoc")
             recovery_path = path.with_name(path.name + ".recovery.json")
@@ -320,66 +478,162 @@ class BatteryClient:
 
     def snapshot(self) -> Snapshot:
         with self.session.lock:
-            logger.debug("Collecting snapshot selected_module=%s", self.module)
             raw: dict[str, str] = {}
-            raw["pwr"] = self.session.exchange("pwr").text
-            modules = parse_pwr(raw["pwr"])
-            logger.debug("Parsed pwr module_count=%d", len(modules))
+            unsupported = set()
+
+            def read(command: str, *, optional: bool = False) -> str | None:
+                if command in unsupported:
+                    return None
+                if command in raw:
+                    return raw[command]
+                try:
+                    text = self._read(command).text
+                except UnsupportedCommand as exc:
+                    if not optional:
+                        raise
+                    raw[command] = exc.response
+                    unsupported.add(command)
+                    return None
+                raw[command] = text
+                return text
+
+            if self._identity is None and self.profile is None:
+                try:
+                    self.info()
+                except UnsupportedCommand:
+                    logger.debug("Identity unavailable; using generic monitoring profile")
+            profile = monitoring_profile(
+                self.profile or (self._identity.name if self._identity else None),
+                explicit=self.profile is not None,
+            )
+            logger.debug(
+                "Snapshot mode=%s profile=%s selected_module=%s",
+                self.monitoring_mode,
+                profile.name,
+                self.module,
+            )
+            local = None
+            summaries = []
+            if self.module is not None or self.monitoring_mode != "parallel":
+                command = f"getpwr {self.module}" if self.module else "getpwr"
+                local = self._parse(
+                    parse_getpwr,
+                    read(command),
+                    command=command,
+                    address=self.module,
+                    profile=profile,
+                )
             if self.module is not None:
-                modules = [m for m in modules if m.address == self.module]
-                if not modules:
-                    raise ProtocolError(f"Module {self.module} is absent from pwr")
+                if profile.pwr_extension:
+                    text = read(f"pwr {self.module}", optional=True)
+                    if text is not None:
+                        summaries = self._parse(
+                            parse_pwr, text, command=f"pwr {self.module}" if self.module else "pwr"
+                        )
+                        if len(summaries) != 1 or summaries[0].address != self.module:
+                            raise ProtocolError(
+                                "Addressed pwr returned another module", response=text
+                            )
+                summaries = summaries or [ModuleReading(address=self.module)]
+            elif self.monitoring_mode == "parallel":
+                summaries = self._parse(parse_pwr, read("pwr"), command="pwr")
+            elif self.monitoring_mode == "auto" or profile.pwr_extension:
+                text = read("pwr", optional=True)
+                if text is not None:
+                    summaries = self._parse(
+                        parse_pwr, text, command=f"pwr {self.module}" if self.module else "pwr"
+                    )
+                if self.monitoring_mode == "single" and len(summaries) > 1:
+                    address = self._identity.address if self._identity else None
+                    summaries = [m for m in summaries if m.address == address]
+                    if not summaries:
+                        raise ProtocolError(
+                            "Cannot identify local module in pwr table", response=text
+                        )
+            if not summaries:
+                summaries = [
+                    ModuleReading(address=self._identity.address if self._identity else None)
+                ]
+            addresses = [m.address for m in summaries]
+            if len(set(addresses)) != len(addresses) or (len(summaries) > 1 and None in addresses):
+                raise ProtocolError(
+                    "pwr returned ambiguous module addresses", response=raw.get("pwr", "")
+                )
             detailed = []
-            for module in modules:
-                command = (
-                    f"getpwr {module.address}" if len(modules) > 1 or self.module else "getpwr"
+            for summary in summaries:
+                addressed = (
+                    self.module is not None
+                    or len(summaries) > 1
+                    or self.monitoring_mode == "parallel"
                 )
-                raw[command] = self.session.exchange(command).text
-                detail = parse_getpwr(raw[command], address=module.address)
-                logger.debug(
-                    "Parsed getpwr module=%s cell_count=%d", module.address, len(detail.cells)
-                )
-                # pwr supplies SOC and firmware extensions not present in getpwr.
-                states = {**module.states, **detail.states}
+                if addressed and self.module is None:
+                    command = f"getpwr {summary.address}"
+                    detail = self._parse(
+                        parse_getpwr,
+                        read(command),
+                        command=command,
+                        address=summary.address,
+                        profile=profile,
+                    )
+                else:
+                    detail = replace(local, address=summary.address)
+                # Detail readings take precedence, while summary-only extensions survive.
+                updates = {
+                    f.name: getattr(detail, f.name)
+                    for f in fields(ModuleReading)
+                    if f.name not in {"raw", "states", "alarms"}
+                    and getattr(detail, f.name) is not None
+                }
+                states = {**summary.states, **detail.states}
                 module = replace(
-                    module,
-                    cells=detail.cells,
-                    capacity_ah=detail.capacity_ah
-                    if detail.capacity_ah is not None
-                    else module.capacity_ah,
+                    summary,
+                    **updates,
                     states=states,
-                    raw={**module.raw, **detail.raw},
+                    raw={**summary.raw, **detail.raw},
                     alarms=list(
                         {
-                            (a.source, a.code, a.cell): a for a in module.alarms + detail.alarms
+                            (a.source, a.code, a.cell): a
+                            for a in summary.alarms + detail.alarms
+                            if not (
+                                a.source.startswith("module.")
+                                and a.source[7:] in detail.states
+                                and a not in detail.alarms
+                            )
                         }.values()
                     ),
-                    voltage_v=detail.voltage_v
-                    if detail.voltage_v is not None
-                    else module.voltage_v,
-                    current_a=detail.current_a
-                    if detail.current_a is not None
-                    else module.current_a,
-                    temperature_c=detail.temperature_c
-                    if detail.temperature_c is not None
-                    else module.temperature_c,
-                    error_code=detail.error_code,
-                    cycle_count=detail.cycle_count,
                 )
                 command = (
-                    f"pwrsys {module.address}" if len(modules) > 1 or self.module else "pwrsys"
+                    f"pwrsys {module.address}"
+                    if addressed and profile.addressed_pwrsys
+                    else "pwrsys"
                 )
-                try:
-                    raw[command] = self.session.exchange(command).text
-                except UnsupportedCommand as exc:
-                    raw[command] = exc.response
-                else:
-                    charge, discharge = recommended_currents(raw[command])
+                text = read(command, optional=True)
+                if text is not None:
+                    charge, discharge = self._parse(
+                        parse_recommended_currents, text, command=command
+                    )
                     module = replace(
                         module, recommended_charge_a=charge, recommended_discharge_a=discharge
                     )
                 detailed.append(module)
-            return Snapshot(datetime.now(timezone.utc).isoformat(), detailed, raw)
+            charge = discharge = None
+            if profile.system_pwrsys:
+                text = read("pwrsys", optional=True)
+                if text is not None:
+                    charge, discharge = self._parse(
+                        parse_recommended_currents, text, command="pwrsys", system=True
+                    )
+            currents = [m.current_a for m in detailed]
+            voltages = [m.voltage_v for m in detailed]
+            system = SystemReading(
+                current_a=sum(currents) if all(v is not None for v in currents) else None,
+                voltage_v=sum(voltages) / len(voltages)
+                if all(v is not None for v in voltages)
+                else None,
+                recommended_charge_a=charge,
+                recommended_discharge_a=discharge,
+            )
+            return Snapshot(datetime.now(timezone.utc).isoformat(), detailed, raw, system)
 
     def watch(self, *, interval: float = 5, count: int | None = None) -> Iterator[Snapshot]:
         if not math.isfinite(interval) or interval <= 0 or (count is not None and count < 1):

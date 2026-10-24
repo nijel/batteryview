@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import TextIO
 
 from . import BatteryClient, BatteryViewError, CommandCancelled, Snapshot
-from .diagnostics import configure_logging
+from .diagnostics import configure_logging, failure_diagnostic
+from .profiles import PROFILES
 from .transport import list_ports
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,14 @@ CSV_FIELDS = [
     "error_code",
     "cycle_count",
     "states",
+    "min_cell_voltage_v",
+    "max_cell_voltage_v",
+    "min_cell_voltage_index",
+    "max_cell_voltage_index",
+    "min_cell_temperature_c",
+    "max_cell_temperature_c",
+    "min_cell_temperature_index",
+    "max_cell_temperature_index",
 ]
 
 
@@ -92,7 +101,7 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--timeout", type=_positive, default=5, help="response timeout in seconds"
         )
-        if name != "collect":
+        if name in {"info", "snapshot", "watch"}:
             command.add_argument(
                 "--module",
                 type=int,
@@ -117,6 +126,20 @@ def parser() -> argparse.ArgumentParser:
         else:
             command.add_argument("--format", choices=["json", "csv"], default="json")
             command.add_argument("--output", type=Path, help="new output file (default: stdout)")
+        command.add_argument(
+            "--read-retries",
+            type=int,
+            choices=range(3),
+            default=0,
+            help="additional attempts for reads only (default: 0)",
+        )
+        if name in {"snapshot", "watch", "collect"}:
+            command.add_argument(
+                "--monitoring-mode", choices=["auto", "single", "parallel"], default="auto"
+            )
+            command.add_argument(
+                "--profile", choices=sorted(PROFILES), help="override automatic model profile"
+            )
         if name == "watch":
             command.add_argument("--interval", type=_positive, default=5)
             command.add_argument(
@@ -133,6 +156,10 @@ def _write_snapshot(snapshot: Snapshot, output: TextIO, csv_writer: csv.DictWrit
     if csv_writer is None:
         output.write(json.dumps(snapshot.to_dict(), ensure_ascii=False) + "\n")
     else:
+        if snapshot.system is not None:
+            csv_writer.writerow(
+                {"timestamp": snapshot.timestamp, "type": "system", **asdict(snapshot.system)}
+            )
         for module in snapshot.modules:
             row = {k: v for k, v in asdict(module).items() if k in CSV_FIELDS}
             row.update(
@@ -186,12 +213,18 @@ def _run(args: argparse.Namespace) -> int:
             timeout=args.timeout,
             module=getattr(args, "module", None),
             shift=not args.no_shift,
+            read_retries=args.read_retries,
+            monitoring_mode=getattr(args, "monitoring_mode", "auto"),
+            profile=getattr(args, "profile", None),
         ) as client:
             if args.command == "collect":
                 result = client.collect(args.output, progress=_progress)
                 print(json.dumps(asdict(result), default=str))
                 if not result.complete:
                     print(f"Collection incomplete; see {result.manifest_path}", file=sys.stderr)
+                    detail = failure_diagnostic(getattr(client, "last_failure", None))
+                    if detail:
+                        print(detail, file=sys.stderr)
                 return 0 if result.complete else 1
             if args.command in {"history", "event", "reset-soc"}:
                 method = {
@@ -229,13 +262,19 @@ def _run(args: argparse.Namespace) -> int:
                 if output is not sys.stdout:
                     output.close()
         return 0
-    except (KeyboardInterrupt, CommandCancelled):
+    except (KeyboardInterrupt, CommandCancelled) as exc:
         logger.debug("Operation interrupted")
         print("Interrupted; any partial report has been retained.", file=sys.stderr)
+        detail = failure_diagnostic(exc)
+        if detail:
+            print(detail, file=sys.stderr)
         return 130
     except (BatteryViewError, OSError, ValueError) as exc:
         logger.debug("Operation failed command=%s error=%s", args.command, type(exc).__name__)
         print(f"batteryview: {exc}", file=sys.stderr)
+        detail = failure_diagnostic(exc)
+        if detail:
+            print(detail, file=sys.stderr)
         return 1
 
 

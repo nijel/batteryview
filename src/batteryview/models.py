@@ -49,6 +49,22 @@ class ModuleReading:
     cells: list[CellReading] = field(default_factory=list)
     alarms: list[Alarm] = field(default_factory=list)
     raw: dict[str, str] = field(default_factory=dict)
+    min_cell_voltage_v: float | None = None
+    max_cell_voltage_v: float | None = None
+    min_cell_voltage_index: int | None = None
+    max_cell_voltage_index: int | None = None
+    min_cell_temperature_c: float | None = None
+    max_cell_temperature_c: float | None = None
+    min_cell_temperature_index: int | None = None
+    max_cell_temperature_index: int | None = None
+
+
+@dataclass(frozen=True)
+class SystemReading:
+    current_a: float | None = None
+    voltage_v: float | None = None
+    recommended_charge_a: float | None = None
+    recommended_discharge_a: float | None = None
 
 
 @dataclass(frozen=True)
@@ -56,6 +72,7 @@ class Snapshot:
     timestamp: str
     modules: list[ModuleReading]
     raw_responses: dict[str, str] = field(default_factory=dict)
+    system: SystemReading | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

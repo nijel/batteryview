@@ -154,6 +154,7 @@ def collect(
                     and artifact.is_file()
                 ):
                     step["artifact"] = artifact.name
+                client.last_failure = exc
                 interrupted = _record_failure(manifest_path, manifest, index, exc)
                 if interrupted or not isinstance(exc, (BatteryViewError, OSError, ValueError)):
                     raise

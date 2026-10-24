@@ -14,3 +14,11 @@ directory. They are read only when explicitly requested with `--private-logs`.
 Do not upload them to CI, commit them, or attach replay output to public issues.
 The private replay test wrapper suppresses payloads on failure. Wheel and source
 distribution builds exclude recordings and editor recovery files.
+
+The damaged historical History recording is a negative completeness reference:
+replay must reject its missing records and retain a byte-exact transcript prefix.
+Other complete recordings retain byte-for-byte assertions. Synthetic coverage
+includes nonempty Event/History fallback, overlapping detailed pages, addressed
+reads, native monitoring profiles, bounded retry recovery and escaped failure
+response tails. Product profile names are protocol/configuration constants, not
+copied device inventories.

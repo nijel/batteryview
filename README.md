@@ -48,8 +48,10 @@ batteryview history --port /dev/ttyUSB0 --output history.txt.txt
 batteryview event --port /dev/ttyUSB0 --output event.txt.txt
 ```
 
-On Windows, use a port such as `--port COM3`. For a specific chained module, add
-`--module 3`. This selects it with `login 3 debug` before starting collection.
+On Windows, use a port such as `--port COM3`. Full History/Event reports and SOC
+reset require a direct connection and reject `--module`. Addressed identity and
+monitoring use explicit commands such as `info 3` and `getpwr 3`; numbered login
+is not a substitute for addressing reads.
 
 Omit `--output` to derive a BatteryView-style filename from the barcode and local
 time. History and Event filenames end in `.txt.txt`, matching the supplied files.
@@ -61,6 +63,13 @@ response receives BatteryView's additional CRLF and the file has a single
 UTF-16LE BOM. Connection setup traffic is excluded. No application metadata or
 JSON is inserted into a vendor report. Failed collections retain partial files
 and exit nonzero; a partial file is not a completed report.
+
+Reports first try `datalist KIND dtls OFFSET`. Firmware that explicitly rejects
+that format uses plain summary pages followed by `data KIND INDEX` for each
+record. The latest record's index determines the count, with `stat` as fallback.
+Missing, repeated or unexpected records fail the export. A firmware-specific
+sixteenth row overlapping the next page is accepted; reads never exceed the
+expected count. Failed attempts remain in the transcript.
 
 ### Support collection for several modules
 
@@ -192,6 +201,45 @@ manifest; output-directory and manifest-write errors are raised to the caller.
 There are no background polling tasks or queued report writes to drain: operations
 share a session lock, and report responses are flushed before their methods return.
 
+## Monitoring modes and profiles
+
+```sh
+batteryview snapshot --port /dev/ttyUSB0 --monitoring-mode single
+batteryview watch --port /dev/ttyUSB0 --monitoring-mode parallel
+batteryview snapshot --port /dev/ttyUSB0 --module 3 --profile generic
+```
+
+`--monitoring-mode auto` is the default: read local `getpwr`, then discover modules
+with `pwr`. Single mode uses the local reading and optional summary extensions;
+parallel mode requires a module table and addressed detail reads. An explicit
+`--module` always uses addressed reads and does not depend on a numbered login.
+Unsupported optional extensions are retained as raw responses without discarding
+valid primary readings; malformed replies and timeouts still fail.
+
+The first monitoring call reads identity to select a bundled native profile.
+`--profile` (or the library's `profile=`) overrides this selection and skips that
+identity query. Profiles cover `generic`, `US3000C`, `UP2500`, `2500LFP2`, `US2K`,
+and `Forcel_C`; unknown device names use `generic`. Profiles encode reviewed
+monitoring layouts and extension enablement/addressing from the original XML,
+including older trailer placement. They do not load executable scripts or
+arbitrary XML regexes. Disabled `tsoh` queries remain disabled.
+
+Snapshots include cell voltage/temperature extrema and their zero-based indices,
+and a `system` summary with total current, average module voltage and available
+system recommended currents. Aggregates describe only the modules in the
+snapshot, including a single selected module. Missing inputs produce `null`;
+unknown fields and alarm codes remain available. CSV adds extrema columns and a
+`type=system` row before module/cell rows. Existing JSON keys remain available.
+The library accepts `monitoring_mode=`, `profile=` and `read_retries=` on
+`BatteryClient`; `SystemReading` is also public.
+
+Operations fail immediately by default. `--read-retries 1` or `2` permits that many
+additional attempts for explicit read commands, after resynchronizing to a debug
+prompt. Reports retry pages from their explicit offset and retain failed responses.
+Pagination continuations, explicit rejections, login, disconnect and all SOC-reset
+commands are never retried. `collect` inherits this policy and stops if recovery
+fails. There is no automatic reconnect loop.
+
 ## Diagnostic logging
 
 ```sh
@@ -199,6 +247,14 @@ batteryview snapshot --port /dev/ttyUSB0 --debug
 batteryview --debug snapshot --port /dev/ttyUSB0 --log-file debug.log
 batteryview snapshot --port /dev/ttyUSB0 --trace-serial --log-file serial-trace.log
 ```
+
+On failure, stderr shows the failed command, available timing/framing context,
+and the last 4096 bytes of its response, including timeout fragments. Control
+characters are escaped, truncation is marked, and an empty reply is explicit.
+This also applies to failures caught by `collect`; its manifest does not contain
+response tails. **Failure output can contain private identifiers and telemetry.**
+Successful traffic is not printed by default. Library protocol exceptions expose
+`response` and `context`; collection clients expose `last_failure`.
 
 `--debug` logs connection stages, baud changes, command names, recognized prompts,
 timing, byte counts, and failure types. It excludes response contents and redacts
@@ -246,9 +302,10 @@ Local comparison with the three original recordings is opt-in:
 python -m pytest -q --private-logs=Logs
 ```
 
-These tests read the recordings at runtime and compare generated transcripts
-byte-for-byte; they do not copy them into public fixtures. Their failures omit
-private payloads. Without that option, the three private reference tests are
+These tests read recordings at runtime without copying them into public fixtures.
+Complete references are compared byte-for-byte. The historical History capture
+contains missing records: its replay now verifies rejection and byte-exact partial
+output instead of accepting an incomplete report. Failures omit private payloads. Without that option, the three private reference tests are
 skipped. CI uses only synthetic data on Windows, macOS, and Linux with Python
 3.11 and 3.14.
 

@@ -82,6 +82,9 @@ def test_info_arguments_and_json(capsys):
         "baudrate": 115200,
         "timeout": 5,
         "shift": False,
+        "monitoring_mode": "auto",
+        "profile": None,
+        "read_retries": 0,
     }
 
 

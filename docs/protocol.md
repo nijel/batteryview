@@ -111,18 +111,32 @@ in `_resetsoc _`; both quirks are retained in generated default filenames.
 
 ## History and Event buttons
 
-1. Save `info`.
-2. Save `stat`, reading `HisData Items` for History or `Data Items` for Event.
-3. Save `data history` or `data event`.
-4. For offsets `0, 15, 30, ...` below the count, save
-   `datalist history dtls OFFSET` or `datalist event dtls OFFSET`.
-5. After each detailed block, save an empty command's response, sending LF.
-   On the supplied firmware this exits the pagination prompt. The final block
-   also gets this empty command, even when it already returned to the prompt.
+1. Save `info`, `stat`, then `data history` or `data event`.
+2. The original uses the latest `Item Index + 1` as its count. Python does the
+   same and falls back to a valid `stat` counter when that index is absent.
+   Disagreements are logged; an indeterminate count is an error.
+3. For offsets `0, 15, 30, ...`, try `datalist KIND dtls OFFSET`.
+4. Explicit rejection switches to `datalist KIND OFFSET`, at the same offset.
+5. After each page, save the response to a blank LF, including the final page.
+6. In fallback mode, save `data KIND INDEX` for each record on the page.
 
-The count is needed only to schedule blocks, not to render their data. Unknown
-columns and firmware-specific fields therefore remain intact in reports.
-Missing/invalid counts fail collection instead of pretending the report is empty.
+The original's `RegoutHistoryData` changes `HistoryGetInfo.DtlsMode` on rejection;
+`OnGetHistoryData` and `OnGetHistoryDataItem` implement both formats for both kinds.
+The original always queues 15 individual reads on the last page, even beyond the
+count. Python bounds those reads and verifies each returned index instead.
+
+Detailed pages are checked for ordered record coverage. Some firmware includes a
+sixteenth record overlapping the next page; that boundary overlap is accepted.
+Other missing, repeated or unexpected indices fail collection and preserve partial
+output. The private historical History capture has three missing records, so it
+is now a negative completeness reference rather than proof of a complete export.
+No response text is reconstructed or modified to repair it. Unknown columns and
+firmware-specific fields remain intact in raw transcripts.
+
+Full reports and SOC reset reject addressed selection before any operation.
+The original uses explicit addressed identity/history-item commands in separate
+UI paths; numbered login is a parameter/protection authorization helper, not a
+verified redirection mechanism for bare report commands.
 
 ## SOC reset button
 
@@ -147,8 +161,8 @@ The user-defined-data button loads `Script.xml` and names its output `resetsoc`.
 `RetrieveHistoryData` sends at least one CR+LF after each initial datalist reply,
 including empty and unsupported replies. The provided firmware rejects event
 and miscellaneous datalist commands in this script; those responses and their
-following prompts are retained. Ordinary report commands treat rejected
-commands as failures.
+following prompts are retained. Ordinary report commands permit the specific
+detailed-list fallback described above; other rejections remain failures.
 
 The Python workflow additionally saves durable recovery information before
 clearing EEPROM, validates the barcode before mutation, and checks identity
@@ -162,7 +176,8 @@ of the saved recovery state; there is no automatic resume command.
 `OnGetpwrs` uses `getpwr` for a single module, or `getpwr N` for addressed reads,
 plus `pwr` for the module table. Extended queries include `pwr N`, `pwrsys N`,
 and system `pwrsys`; some are optional or disabled by configuration. Module
-login uses `login N debug` with one-based module numbering.
+authorization for parameter/protection operations uses `login N debug`, while
+identity and monitoring reads include their addresses explicitly.
 
 The Python `pwr` parser accepts both tables and labeled summaries headed by
 `Power N`. The latter identifies the connected module's reported address, not an
@@ -174,10 +189,13 @@ remain in `raw`. A labeled block requires a numeric address and recognizable
 voltage; optional missing fields remain absent. Its event masks are not assumed
 to share the hash-format error-code bit mapping.
 
-A single returned module uses bare `getpwr` and `pwrsys` unless an explicit
-`--module` was selected, independently of that module's reported address. No
-preceding addresses are enumerated. Multiple returned modules retain addressed
-queries. The snapshot merge keeps capacity from `pwr` if detailed reads omit it.
+Python's default auto mode acquires local `getpwr` first, then discovers modules
+with `pwr`. Single mode uses the local reading and profile-enabled extensions;
+parallel mode starts with the table and addressed detail reads. Explicit
+`--module` reads use `info N`, `getpwr N` and profile-enabled `pwr N`/`pwrsys N`.
+Profiles for UP2500 and 2500LFP2 use unaddressed `pwrsys` and disable the optional
+`pwr` extension in single mode. System `pwrsys` is read once where enabled.
+A single labeled address does not imply that preceding addresses exist. The snapshot merge keeps capacity from `pwr` if detailed reads omit it.
 `Unknown command` replies are recognized as unsupported; optional `pwrsys` can
 then be omitted without losing the other snapshot readings.
 
@@ -187,7 +205,17 @@ capacity, basic state, voltage state, current state, temperature state. Cell
 records contain voltage, temperature, voltage state, temperature state.
 The configured trailing fields are error code and cycle count. Known error bits
 are decoded using `Indicator.xml`, and unknown bits remain visible. The library
-also preserves the full hash sequence, including other firmware trailers.
+also preserves the full hash sequence, including other firmware trailers. Native
+profiles share the eight scalar/four cell-field layout; US2K uses the last trailer
+pair, while the other supported layouts use the first pair after the cell block.
+Labeled replies normalize module states, SOC and error codes too. Extrema use
+zero-based cell indices; system aggregates require values from every observed
+module rather than silently treating missing values as zero.
+
+Bundled native profiles are selected by `Device name`, with an explicit override
+and a generic fallback for unknown models. They encode supported fields/scales,
+extension enablement and addressing from the default and model-specific XML.
+They do not execute XML or enable the original's disabled SOH queries.
 
 Definitions cannot be mechanically reused: .NET variable-length lookbehinds
 are incompatible with Python's standard regex engine, some XML declarations
@@ -198,9 +226,9 @@ labels/headers and retains unrecognized fields rather than substituting zero.
 ## Support collection wrapper
 
 `collect` reuses the identity, History, Event, and snapshot operations in that
-order, holding the session lock across the run. History/Event command sequences
-and UTF-16 transcript serialization are unchanged, including their repeated
-`info`/`stat` requests. No new battery commands are introduced. Normal disconnect
+order, holding the session lock across the run. It uses the same History/Event
+command selection and UTF-16 serialization as standalone exports, including
+repeated `info`/`stat` requests. Normal disconnect
 runs afterward and remains outside report content.
 
 The wrapper supports repeated physical connections to different modules with one
@@ -221,9 +249,13 @@ available, and failure type/message. Status transitions are `pending` → `runni
 → `complete`, `failed`, or `interrupted`; later steps become `skipped` after a
 failure or interruption. Updates replace the run's manifest atomically.
 
-The first failed step ends collection without additional collection commands or
-automatic retries. Existing artifacts remain available, and read-response payloads
-are not copied into manifest errors. Expected operational failures return an
+The first failed step ends collection. By default reads are not retried;
+`read_retries=1` or `2` enables bounded recovery of explicit reads after a debug
+prompt is verified. Pagination continuations and reset operations are never
+retried. Failed report attempts and resynchronization replies remain in reports. Existing artifacts remain available, and read-response payloads
+are not copied into manifest errors. The CLI prints an escaped, bounded response
+tail from the failed exchange, including failures returned inside collection;
+that diagnostic can contain private data. Successful raw traffic remains opt-in. Expected operational failures return an
 incomplete collection result; interruption is re-raised after finalization. Fatal
 manifest I/O failures are raised and can leave the last valid manifest indicating
 an unfinished run. Serial packet traces are only produced when explicitly enabled.

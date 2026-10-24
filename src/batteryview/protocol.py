@@ -5,7 +5,7 @@ import math
 import re
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from .diagnostics import SERIAL_TRACE, command_label, serial_logger
@@ -35,6 +35,7 @@ Boundary = Literal["prompt", "page", "disconnect"]
 class Response:
     text: str
     boundary: Boundary
+    context: dict = field(default_factory=dict)
 
     @property
     def unsupported(self) -> bool:
@@ -151,6 +152,7 @@ class ConsoleSession:
                 raise ProtocolError(
                     "Console state is unknown; call resynchronize() before sending another command"
                 )
+            previous_prompt = self.current_prompt
             self.synchronized = False
             self.current_prompt = None
             self._needs_resync = True
@@ -168,6 +170,17 @@ class ConsoleSession:
                 self._write(data)
                 response = self._receive(command, paginated=paginated, timeout=wait)
             except BaseException as exc:
+                if isinstance(exc, OSError):
+                    exc = ConnectionError(str(exc))
+                if isinstance(exc, ProtocolError):
+                    exc.context = {
+                        "command": label,
+                        "terminator": terminator,
+                        "elapsed_s": round(time.monotonic() - started, 3),
+                        "timeout_s": wait,
+                        "boundary": None,
+                        "previous_prompt": previous_prompt,
+                    }
                 logger.debug(
                     "Command failed command=%s error=%s elapsed=%.3fs partial_bytes=%d",
                     label,
@@ -175,7 +188,14 @@ class ConsoleSession:
                     time.monotonic() - started,
                     len(getattr(exc, "response", "")),
                 )
-                raise
+                raise exc
+            response.context.update(
+                command=label,
+                terminator=terminator,
+                elapsed_s=round(time.monotonic() - started, 3),
+                timeout_s=wait,
+                boundary=response.boundary,
+            )
             self.synchronized = response.boundary == "prompt"
             self.current_prompt = response.prompt if self.synchronized else None
             self._needs_resync = False
@@ -189,7 +209,17 @@ class ConsoleSession:
                 response.unsupported,
             )
             if response.unsupported and not allow_unsupported:
-                raise UnsupportedCommand(f"Unsupported command: {label!r}", response=response.text)
+                raise UnsupportedCommand(
+                    f"Unsupported command: {label!r}",
+                    response=response.text,
+                    context={
+                        "command": label,
+                        "terminator": terminator,
+                        "elapsed_s": round(time.monotonic() - started, 3),
+                        "timeout_s": wait,
+                        "boundary": response.boundary,
+                    },
+                )
             return response
 
     def _receive(
@@ -231,7 +261,7 @@ class ConsoleSession:
                 )
             try:
                 chunk = self.transport.read()
-            except ConnectionError as exc:
+            except (ConnectionError, OSError) as exc:
                 raise ConnectionError(
                     str(exc), response=data.decode("ascii", errors="replace")
                 ) from exc

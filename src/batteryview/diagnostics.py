@@ -77,3 +77,22 @@ def configure_logging(
         logger.handlers = previous[2]
         serial_logger.setLevel(previous[3])
         handler.close()
+
+
+def failure_diagnostic(exc: BaseException | None) -> str:
+    """Format only the failed exchange, never a history of successful traffic."""
+    if exc is None:
+        return ""
+    # Reset wraps the wire error with recovery instructions.
+    while not hasattr(exc, "response") and exc.__cause__ is not None:
+        exc = exc.__cause__
+    context = getattr(exc, "context", {})
+    if not context and not hasattr(exc, "response"):
+        return ""
+    fields = " ".join(f"{key}={value!r}" for key, value in context.items())
+    response = getattr(exc, "response", "").encode("utf-8")
+    tail = response[-4096:].decode("utf-8", errors="replace")
+    detail = repr(tail) if response else "<nothing received>"
+    if len(response) > 4096:
+        detail = "[truncated to last 4096 bytes] " + detail
+    return f"Last communication: {fields}\nResponse: {detail}"

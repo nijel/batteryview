@@ -77,19 +77,19 @@ def collection_exchanges(*, barcode="TEST_A", address=8):
         + report_exchanges("event", barcode=barcode, address=address)
         + [
             (
-                b"pwr\n",
-                response(
-                    "pwr",
-                    f"Power {address}\r\r\nVoltage : 50000 mV\r\r\n"
-                    "Current : -2000 mA\r\r\nCoulomb : 50 %",
-                ),
-            ),
-            (
                 b"getpwr\n",
                 response(
                     "getpwr",
                     "50000# -2000# 20000# 100000# Dischg# Normal# Normal# Normal#\r\r\n"
                     "3101# 20000# Normal# Normal#\r\r\n3102# 21000# Normal# Normal#",
+                ),
+            ),
+            (
+                b"pwr\n",
+                response(
+                    "pwr",
+                    f"Power {address}\r\r\nVoltage : 50000 mV\r\r\n"
+                    "Current : -2000 mA\r\r\nCoulomb : 50 %",
                 ),
             ),
             (

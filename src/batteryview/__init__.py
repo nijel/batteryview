@@ -20,6 +20,7 @@ from .models import (
     ModuleReading,
     ReportResult,
     Snapshot,
+    SystemReading,
 )
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -39,5 +40,6 @@ __all__ = [
     "ReportResult",
     "ResetRecoveryError",
     "Snapshot",
+    "SystemReading",
     "UnsupportedCommand",
 ]

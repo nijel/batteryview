@@ -140,13 +140,13 @@ def test_single_labeled_module_snapshot_uses_connected_console_and_capacity_fall
     unsupported = "pwrsys\n\r@\r\r\nUnknown command 'pwrsys' - try 'help'\r\n\rpylon_debug>"
     session, transport = replay(
         [
-            (b"pwr\n", PWR_LABELED),
             (b"getpwr\n", detailed),
+            (b"pwr\n", PWR_LABELED),
             (b"pwrsys\n", unsupported),
             (b"cmdquit\n", "cmdquit\n\r"),
         ]
     )
-    with BatteryClient(session=session) as client:
+    with BatteryClient(session=session, profile="generic") as client:
         snapshot = client.snapshot()
     assert len(snapshot.modules) == 1
     module = snapshot.modules[0]
@@ -159,19 +159,20 @@ def test_single_labeled_module_snapshot_uses_connected_console_and_capacity_fall
     assert snapshot.raw_responses["pwrsys"] == unsupported
     assert snapshot.raw_responses["pwr"] == PWR_LABELED
     assert module.raw["Future field"] == "SYNTHETIC_VALUE"
-    assert transport.writes == [b"pwr\n", b"getpwr\n", b"pwrsys\n", b"cmdquit\n"]
+    assert transport.writes == [b"getpwr\n", b"pwr\n", b"pwrsys\n", b"cmdquit\n"]
     assert transport.closed and not transport.exchanges
 
 
 def test_explicit_labeled_module_selection_keeps_addressed_queries():
     session = ScriptedSession(
         [
-            ("pwr", Response(PWR_LABELED, "prompt")),
             ("getpwr 8", Response(GETPWR, "prompt")),
+            ("pwr 8", Response(PWR_LABELED, "prompt")),
             ("pwrsys 8", Response("Recommend chg current : 10000", "prompt")),
+            ("pwrsys", Response("system Recommend chg current : 20000", "prompt")),
         ]
     )
-    snapshot = BatteryClient(session=session, module=8).snapshot()
+    snapshot = BatteryClient(session=session, module=8, profile="generic").snapshot()
     assert [module.address for module in snapshot.modules] == [8]
     assert not session.exchanges
 
@@ -229,6 +230,7 @@ def test_info_preserves_new_firmware_fields_and_short_date():
 def test_snapshot_chain_addressing_and_optional_command():
     session = ScriptedSession(
         [
+            ("getpwr", Response(GETPWR, "prompt")),
             ("pwr", Response(PWR, "prompt")),
             ("getpwr 1", Response(GETPWR, "prompt")),
             (
@@ -239,9 +241,10 @@ def test_snapshot_chain_addressing_and_optional_command():
             ),
             ("getpwr 2", Response(GETPWR, "prompt")),
             ("pwrsys 2", UnsupportedCommand("unsupported", response="Invalid command")),
+            ("pwrsys", Response("system Recommend chg current : 20000", "prompt")),
         ]
     )
-    result = BatteryClient(session=session).snapshot()
+    result = BatteryClient(session=session, profile="generic").snapshot()
     assert result.modules[0].recommended_charge_a == 10
     assert result.modules[0].recommended_discharge_a == -20
     assert result.modules[1].recommended_charge_a is None
@@ -252,12 +255,19 @@ def test_snapshot_chain_addressing_and_optional_command():
 def test_explicit_module_does_not_read_other_module():
     session = ScriptedSession(
         [
-            ("pwr", Response(PWR, "prompt")),
             ("getpwr 2", Response(GETPWR, "prompt")),
+            (
+                "pwr 2",
+                Response(
+                    PWR.replace("1 50000 -2000 -5000 Dischg Normal Normal Low 50% novel\r\n", ""),
+                    "prompt",
+                ),
+            ),
             ("pwrsys 2", Response("Recommend chg current : 10000", "prompt")),
+            ("pwrsys", Response("system Recommend chg current : 20000", "prompt")),
         ]
     )
-    result = BatteryClient(session=session, module=2).snapshot()
+    result = BatteryClient(session=session, module=2, profile="generic").snapshot()
     assert [module.address for module in result.modules] == [2]
     assert not session.exchanges
 

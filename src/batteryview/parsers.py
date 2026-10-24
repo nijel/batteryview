@@ -6,10 +6,16 @@ from dataclasses import replace
 
 from .errors import ProtocolError
 from .models import Alarm, CellReading, DeviceInfo, ModuleReading
+from .profiles import MonitoringProfile
 
 logger = logging.getLogger(__name__)
 
 PWR_STATUS_LABELS = {
+    "Base State": "Base.St",
+    "Volt. State": "Volt.St",
+    "Curr. State": "Curr.St",
+    "Tempr. State": "Temp.St",
+    "Temp. State": "Temp.St",
     "Basic Status": "Base.St",
     "Volt Status": "Volt.St",
     "Current Status": "Curr.St",
@@ -133,6 +139,10 @@ def module_from_row(row: dict[str, str]) -> ModuleReading:
         current_a=number(row.get("Curr"), 1000),
         temperature_c=number(row.get("Tempr"), 1000),
         soc_pct=number(row.get("Coulomb")),
+        min_cell_voltage_v=number(row.get("Vlow", row.get("Vlowest")), 1000),
+        max_cell_voltage_v=number(row.get("Vhigh", row.get("Vhighest")), 1000),
+        min_cell_temperature_c=number(row.get("Tlow"), 1000),
+        max_cell_temperature_c=number(row.get("Thigh"), 1000),
         states=states,
         alarms=_alarms(states, "module"),
         raw=row,
@@ -143,7 +153,10 @@ def parse_pwr(text: str) -> list[ModuleReading]:
     rows = parse_table(text)
     if rows:
         logger.debug("Parsed pwr format=table module_count=%d", len(rows))
-        return [module_from_row(row) for row in rows]
+        modules = [module_from_row(row) for row in rows]
+        if any(m.address is None or m.voltage_v is None for m in modules):
+            raise ProtocolError("pwr table has no recognizable address or voltage", response=text)
+        return modules
 
     # A directly connected module may report a labeled summary rather than a
     # rack table. 'Power N' identifies that module, not the number of modules.
@@ -182,7 +195,9 @@ def parse_pwr(text: str) -> list[ModuleReading]:
     return modules
 
 
-def parse_getpwr(text: str, *, address: int | None = None) -> ModuleReading:
+def parse_getpwr(
+    text: str, *, address: int | None = None, profile: MonitoringProfile | None = None
+) -> ModuleReading:
     # RegoutConfig.xml: first 8 '#' fields are module values, followed by cells
     # with four fields each. Use complete cell lines to avoid interpreting trailers.
     cells = []
@@ -190,7 +205,9 @@ def parse_getpwr(text: str, *, address: int | None = None) -> ModuleReading:
     line_end = 0
     for line in text.splitlines(keepends=True):
         line_end += len(line)
-        match = re.fullmatch(r"\s*(-?\d+)#\s+(-?\d+)#\s+(\w+)#\s+([\w ]+)#\s*", line)
+        match = re.fullmatch(
+            r"\s*(-?\d+)#\s+(-?\d+)#\s+([A-Za-z][\w ]*)#\s+([A-Za-z][\w ]*)#\s*", line
+        )
         if match:
             trailer_start = line_end
             states = {"Volt.St": match[3], "Temp.St": match[4].strip()}
@@ -226,6 +243,12 @@ def parse_getpwr(text: str, *, address: int | None = None) -> ModuleReading:
             current_a=number(fields.get("Current"), 1000),
             temperature_c=number(fields.get("Temperature"), 1000),
             capacity_ah=number(fields.get("Total Coulomb"), 1000),
+            soc_pct=number(fields.get("Percent", fields.get("Coulomb"))),
+            states={
+                key: fields[label] for label, key in PWR_STATUS_LABELS.items() if label in fields
+            },
+            error_code=_code(fields.get("System Fault", fields.get("Error Code"))),
+            cycle_count=integer(fields.get("Cycle Count")),
             raw=fields,
         )
         for row in parse_table(text):
@@ -250,27 +273,68 @@ def parse_getpwr(text: str, *, address: int | None = None) -> ModuleReading:
     # then cycle count. Do not infer either if that trailer is absent.
     if trailer_start is not None:
         trailer = re.findall(r"(-?\d+)\s*#", text[trailer_start:])
+        if profile and profile.trailer_from_end:
+            trailer = trailer[-2:]
         error_code = integer(trailer[0]) if trailer else None
         cycles = integer(trailer[1]) if len(trailer) > 1 else None
         module = replace(module, error_code=error_code, cycle_count=cycles)
-        if error_code is not None and error_code >= 0:
-            for bit in range(error_code.bit_length()):
-                if error_code & (1 << bit):
-                    code = ERROR_BITS[bit] if bit < len(ERROR_BITS) else f"Unknown error bit {bit}"
-                    alarms.append(
-                        Alarm(
-                            "module.error_code",
-                            code,
-                            "error" if bit < len(ERROR_BITS) else "unknown",
-                        )
+    if module.error_code is not None and module.error_code >= 0:
+        for bit in range(module.error_code.bit_length()):
+            if module.error_code & (1 << bit):
+                code = ERROR_BITS[bit] if bit < len(ERROR_BITS) else f"Unknown error bit {bit}"
+                alarms.append(
+                    Alarm(
+                        "module.error_code", code, "error" if bit < len(ERROR_BITS) else "unknown"
                     )
+                )
     for cell in cells:
         alarms.extend(_alarms(cell.states, "cell", cell.index))
-    return replace(module, cells=cells, alarms=alarms)
+    extrema = {}
+    for field, suffix in (("voltage_v", "voltage"), ("temperature_c", "temperature")):
+        available = [c for c in cells if getattr(c, field) is not None]
+        for prefix, select in (("min", min), ("max", max)):
+            if available:
+                cell = select(available, key=lambda c: getattr(c, field))
+                extrema[f"{prefix}_cell_{field}"] = getattr(cell, field)
+                extrema[f"{prefix}_cell_{suffix}_index"] = cell.index
+    return replace(module, cells=cells, alarms=alarms, **extrema)
 
 
-def recommended_currents(text: str) -> tuple[float | None, float | None]:
+def recommended_currents(text: str, *, system: bool = False) -> tuple[float | None, float | None]:
     fields = {k.lower(): v for k, v in key_values(text).items()}
+    if system:
+        fields = {
+            k.removeprefix("system "): v for k, v in fields.items() if k.startswith("system ")
+        }
     charge = fields.get("recommend chg current", fields.get("advise charge current"))
     discharge = fields.get("recommend dsg current", fields.get("advise discharge current"))
     return number(charge, 1000), number(discharge, 1000)
+
+
+def record_indices(text: str, *, detailed: bool = False) -> list[int]:
+    """Read indices without treating cell rows or command echoes as records."""
+    labeled = [
+        int(m) for m in re.findall(r"(?:^|[\r\n])\s*(?:Rec\s+)?Item Index\s*:\s*(\d+)", text)
+    ]
+    if detailed or labeled:
+        return labeled
+    return [int(m) for m in re.findall(r"(?:^|[\r\n])\s*(\d+)\s+\d+-\d+-\d+\s+\d+:\d+:\d+", text)]
+
+
+def _code(value: str | None) -> int | None:
+    if value is None:
+        return None
+    match = re.match(r"\s*(0[xX][0-9a-fA-F]+|\d+)\b", value)
+    return int(match[1], 16 if match[1].lower().startswith("0x") else 10) if match else None
+
+
+def parse_recommended_currents(
+    text: str, *, system: bool = False
+) -> tuple[float | None, float | None]:
+    values = recommended_currents(text)
+    system_values = recommended_currents(text, system=True)
+    if all(value is None for value in (*values, *system_values)):
+        raise ProtocolError(
+            "pwrsys response has no recognizable recommended currents", response=text
+        )
+    return system_values if system else values

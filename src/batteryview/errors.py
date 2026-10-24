@@ -8,9 +8,10 @@ class BatteryViewError(Exception):
 class ProtocolError(BatteryViewError):
     """The device returned an unexpected or malformed response."""
 
-    def __init__(self, message: str, *, response: str = ""):
+    def __init__(self, message: str, *, response: str = "", context: dict | None = None):
         super().__init__(message)
         self.response = response
+        self.context = context or {}
 
 
 class ConnectionError(ProtocolError):

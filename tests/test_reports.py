@@ -51,9 +51,12 @@ def test_detailed_report_final_partial_block_and_exit_sequence(tmp_path, replay,
         (f"data {kind}\n".encode(), "\rpylon_debug>"),
     ]
     exchanges += [
-        (f"datalist {kind} dtls 0\n".encode(), f"record 0..14\r{CONTINUATION}\r"),
+        (
+            f"datalist {kind} dtls 0\n".encode(),
+            "\r".join(f"{i} 00-01-01 00:00:00 50000" for i in range(15)) + f"\r{CONTINUATION}\r",
+        ),
         (b"\n", "\r                          \r\rpylon_debug>"),
-        (f"datalist {kind} dtls 15\n".encode(), "record 15\rpylon_debug>"),
+        (f"datalist {kind} dtls 15\n".encode(), "15 00-01-01 00:00:00 50000\rpylon_debug>"),
         (b"\n", "\n\rpylon_debug>"),
     ]
     session, transport = replay(exchanges)
@@ -83,7 +86,9 @@ def test_failed_report_keeps_partial_response(tmp_path):
 
 
 def test_invalid_count_is_not_an_empty_success(tmp_path):
-    session = ScriptedSession([("info", reply(INFO)), ("stat", reply("HisData Items : ???"))])
+    session = ScriptedSession(
+        [("info", reply(INFO)), ("stat", reply("HisData Items : ???")), ("data history", reply())]
+    )
     with pytest.raises(ProtocolError, match="count"):
         BatteryClient(session=session).export_history(tmp_path / "report.txt")
 
@@ -272,6 +277,21 @@ def _check_private_recording(tmp_path, replay, kind, fixtures):
         session, transport = replay(exchanges, chunk_size=1024)
         client = BatteryClient(session=session)
         method = client.export_history if kind == "history" else client.export_events
+        if kind == "history":
+            from batteryview.parsers import record_indices
+
+            latest = record_indices(frames[2], detailed=True)
+            expected_count = latest[-1] + 1
+            observed = {
+                i for frame in frames if frame.startswith("datalist") for i in record_indices(frame)
+            }
+            if set(range(expected_count)) - observed:
+                # A damaged original capture must no longer pass completeness checks.
+                with pytest.raises(ProtocolError, match="missing, repeated or unexpected"):
+                    method(tmp_path / "report.txt")
+                partial = (tmp_path / "report.txt").read_bytes()
+                assert reference.startswith(partial)
+                return
         result = method(tmp_path / "report.txt")
         assert not transport.exchanges
         if kind == "history":
