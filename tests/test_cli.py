@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from batteryview import BatteryViewError, DeviceInfo, ReportResult, Snapshot
+from batteryview import BatteryViewError, CollectionResult, DeviceInfo, ReportResult, Snapshot
 from batteryview.cli import main
 from batteryview.models import CellReading, ModuleReading
 
@@ -14,6 +14,7 @@ from batteryview.models import CellReading, ModuleReading
 class FakeClient:
     options = None
     failure = None
+    collection_complete = True
 
     def __init__(self, port, **kwargs):
         type(self).options = {"port": port, **kwargs}
@@ -52,10 +53,17 @@ class FakeClient:
     export_events = export_history
     reset_soc = export_history
 
+    def collect(self, output, *, progress):
+        progress("identity", 1, 1)
+        return CollectionResult(
+            output, output / "synthetic_manifest.json", self.collection_complete
+        )
+
 
 @pytest.fixture(autouse=True)
 def fake_client(monkeypatch):
     FakeClient.failure = None
+    FakeClient.collection_complete = True
     monkeypatch.setattr("batteryview.cli.BatteryClient", FakeClient)
 
 
@@ -192,3 +200,48 @@ def test_default_cli_does_not_configure_root_logger(capsys):
     assert main(["info", "--port", "COM3"]) == 0
     assert (root.level, root.handlers) == previous
     assert not capsys.readouterr().err
+
+
+@pytest.mark.parametrize("complete", [True, False])
+def test_collect_summary_and_exit_status(tmp_path, capsys, complete):
+    FakeClient.collection_complete = complete
+    assert main(["collect", "--port", "COM3", "--output", str(tmp_path)]) == (0 if complete else 1)
+    out, err = capsys.readouterr()
+    summary = json.loads(out)
+    assert summary["complete"] is complete
+    assert summary["directory"] == str(tmp_path)
+    assert "identity: 1/1" in err
+    assert ("Collection incomplete" in err) is (not complete)
+    assert FakeClient.options["module"] is None
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["collect", "--port", "COM3"],
+        ["collect", "--port", "COM3", "--output", "support", "--module", "8"],
+        ["collect", "--port", "COM3", "--output", "support", "--format", "json"],
+    ],
+)
+def test_collect_requires_output_and_rejects_module_and_format(args):
+    with pytest.raises(SystemExit) as error:
+        main(args)
+    assert error.value.code == 2
+
+
+def test_collect_cancellation_returns_130(tmp_path, monkeypatch, capsys):
+    def cancel(self, output, **kwargs):
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(FakeClient, "collect", cancel)
+    assert main(["collect", "--port", "COM3", "--output", str(tmp_path)]) == 130
+    out, err = capsys.readouterr()
+    assert not out and "Interrupted" in err
+
+
+@pytest.mark.parametrize("flags", [["--debug"], ["--trace-serial"]])
+def test_collect_accepts_diagnostic_flags_without_changing_stdout(tmp_path, capsys, flags):
+    assert main([*flags, "collect", "--port", "COM3", "--output", str(tmp_path)]) == 0
+    out, err = capsys.readouterr()
+    assert json.loads(out)["complete"]
+    assert "Diagnostics enabled" in err

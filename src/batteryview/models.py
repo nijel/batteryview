@@ -69,3 +69,10 @@ class ReportResult:
     responses: int
     complete: bool = True
     recovery_path: Path | None = None
+
+
+@dataclass(frozen=True)
+class CollectionResult:
+    directory: Path
+    manifest_path: Path
+    complete: bool

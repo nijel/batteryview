@@ -12,7 +12,15 @@ from .errors import (
     ResetRecoveryError,
     UnsupportedCommand,
 )
-from .models import Alarm, CellReading, DeviceInfo, ModuleReading, ReportResult, Snapshot
+from .models import (
+    Alarm,
+    CellReading,
+    CollectionResult,
+    DeviceInfo,
+    ModuleReading,
+    ReportResult,
+    Snapshot,
+)
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -21,6 +29,7 @@ __all__ = [
     "BatteryClient",
     "BatteryViewError",
     "CellReading",
+    "CollectionResult",
     "CommandTimeout",
     "CommandCancelled",
     "ConnectionError",

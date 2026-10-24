@@ -195,6 +195,39 @@ misidentify their encoding, some type definitions are inconsistent, and
 configuration limit expressions contain apparent typos. Python parsing uses
 labels/headers and retains unrecognized fields rather than substituting zero.
 
+## Support collection wrapper
+
+`collect` reuses the identity, History, Event, and snapshot operations in that
+order, holding the session lock across the run. History/Event command sequences
+and UTF-16 transcript serialization are unchanged, including their repeated
+`info`/`stat` requests. No new battery commands are introduced. Normal disconnect
+runs afterward and remains outside report content.
+
+The wrapper supports repeated physical connections to different modules with one
+shared flat output directory. Complete support exports routed to a remote module
+have not been verified. Consequently, `collect` rejects addressed module selection;
+the existing monitoring and standalone command interfaces remain available.
+
+Each invocation reserves its own manifest using a UTC timestamp and UUID-based
+run ID. JSON artifacts share that run ID, while transcripts keep their existing
+barcode/timestamp filenames. Exclusive artifact creation prevents replacement of
+earlier files, and manifest references never claim a colliding report from an
+earlier run as this run's partial output.
+
+Manifest format version 1 records the application version, run ID, start/end times,
+overall status/completeness, device identity, and ordered step records. Step records
+contain a name, status, relative artifact filename, reported record count where
+available, and failure type/message. Status transitions are `pending` → `running`
+→ `complete`, `failed`, or `interrupted`; later steps become `skipped` after a
+failure or interruption. Updates replace the run's manifest atomically.
+
+The first failed step ends collection without additional collection commands or
+automatic retries. Existing artifacts remain available, and read-response payloads
+are not copied into manifest errors. Expected operational failures return an
+incomplete collection result; interruption is re-raised after finalization. Fatal
+manifest I/O failures are raised and can leave the last valid manifest indicating
+an unfinished run. Serial packet traces are only produced when explicitly enabled.
+
 ## Acceptance still requiring hardware
 
 - Confirm 1200-to-115200 switching, serial adapter behavior, and debug login.

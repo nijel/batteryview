@@ -81,6 +81,7 @@ def parser() -> argparse.ArgumentParser:
         ("watch", "stream module and cell measurements"),
         ("history", "save a BatteryView-compatible History transcript"),
         ("event", "save a BatteryView-compatible Event transcript"),
+        ("collect", "collect support files from the directly connected module"),
         ("reset-soc", "execute EEPROM clear, reset, and barcode restoration; save transcript"),
     ]:
         command = sub.add_parser(name, help=help_text, parents=[diagnostics])
@@ -91,17 +92,25 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--timeout", type=_positive, default=5, help="response timeout in seconds"
         )
-        command.add_argument(
-            "--module",
-            type=int,
-            choices=range(1, 17),
-            metavar="1..16",
-            help="select a chained module",
-        )
+        if name != "collect":
+            command.add_argument(
+                "--module",
+                type=int,
+                choices=range(1, 17),
+                metavar="1..16",
+                help="select a chained module",
+            )
         command.add_argument(
             "--no-shift", action="store_true", help="skip the 1200-baud console-mode switch"
         )
-        if name in {"history", "event", "reset-soc"}:
+        if name == "collect":
+            command.add_argument(
+                "--output",
+                type=Path,
+                required=True,
+                help="shared output directory; existing files are preserved",
+            )
+        elif name in {"history", "event", "reset-soc"}:
             command.add_argument(
                 "--output", type=Path, help="new transcript path; never overwritten"
             )
@@ -175,9 +184,15 @@ def _run(args: argparse.Namespace) -> int:
             args.port,
             baudrate=args.baud,
             timeout=args.timeout,
-            module=args.module,
+            module=getattr(args, "module", None),
             shift=not args.no_shift,
         ) as client:
+            if args.command == "collect":
+                result = client.collect(args.output, progress=_progress)
+                print(json.dumps(asdict(result), default=str))
+                if not result.complete:
+                    print(f"Collection incomplete; see {result.manifest_path}", file=sys.stderr)
+                return 0 if result.complete else 1
             if args.command in {"history", "event", "reset-soc"}:
                 method = {
                     "history": client.export_history,

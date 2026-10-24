@@ -11,8 +11,9 @@ from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .collection import collect
 from .errors import BatteryViewError, ProtocolError, ResetRecoveryError, UnsupportedCommand
-from .models import DeviceInfo, ReportResult, Snapshot
+from .models import CollectionResult, DeviceInfo, ReportResult, Snapshot
 from .parsers import parse_getpwr, parse_info, parse_pwr, recommended_currents, record_count
 from .protocol import ConsoleSession, Response
 from .transcript import TranscriptWriter, report_filename
@@ -93,6 +94,14 @@ class BatteryClient:
         with self.session.lock:
             self._identity = parse_info(self.session.exchange("info").text)
             return self._identity
+
+    def collect(self, output: str | Path, *, progress: Progress | None = None) -> CollectionResult:
+        """Collect the directly connected module, stopping at the first failure.
+
+        Reuse an output directory across physical module connections; every run
+        has its own manifest and JSON artifacts. Earlier files are never replaced.
+        """
+        return collect(self, output, progress=progress)
 
     def _output_path(self, output: str | Path | None, kind: str) -> Path:
         if output is not None:

@@ -221,6 +221,7 @@ __marimo__/
 
 /BatteryView_*
 /Logs
+/support/
 
 # Editor recovery files can contain private data.
 *.swp
