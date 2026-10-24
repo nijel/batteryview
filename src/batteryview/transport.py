@@ -22,12 +22,12 @@ class SerialTransport:
 
         try:
             logger.debug(
-                "Opening serial port baud=%d data_bits=8 parity=N stop_bits=1 read_timeout=%.3fs",
+                "Opening serial port baud=%d data_bits=8 parity=N stop_bits=1 read_timeout=%.3fs dtr=False rts=False",
                 baudrate,
                 read_timeout,
             )
             self._serial = serial.Serial(
-                port,
+                None,
                 baudrate,
                 bytesize=8,
                 parity="N",
@@ -38,9 +38,20 @@ class SerialTransport:
                 rtscts=False,
                 dsrdtr=False,
             )
+            # Configure while closed: pySerial otherwise opens with RTS/DTR active.
+            # Disabling flow control alone does not deactivate these output lines.
+            self._serial.port = port
+            self._open()
         except (serial.SerialException, OSError, ValueError) as exc:
             logger.debug("Serial open failed error=%s", type(exc).__name__)
             raise ConnectionError(f"Cannot open {port}: {exc}") from exc
+
+    def _open(self) -> None:
+        """Match .NET SerialPort defaults on both initial open and baud changes."""
+        self._serial.dtr = False
+        self._serial.rts = False
+        logger.debug("Opening serial handle dtr=False rts=False")
+        self._serial.open()
 
     @property
     def baudrate(self) -> int:
@@ -55,7 +66,7 @@ class SerialTransport:
             # BatteryView closes and reopens the port when changing its baud rate.
             self._serial.close()
             self._serial.baudrate = value
-            self._serial.open()
+            self._open()
         except (serial.SerialException, OSError, ValueError) as exc:
             logger.debug("Baud change failed error=%s", type(exc).__name__)
             raise ConnectionError(f"Cannot change console baud rate: {exc}") from exc

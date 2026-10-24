@@ -25,6 +25,10 @@ then opens the console at 115200 baud, 8N1, without flow control. Use `--no-shif
 to connect to a console already in command mode, or `--baud` for another console
 rate. Close other applications using the port before connecting.
 
+RTS and DTR are explicitly inactive, matching BatteryView's .NET serial defaults.
+Their states are set before the initial open and each baud-change reopen, and
+included in debug diagnostics.
+
 Connection setup recognizes a console that is already at `pylon_debug>` and
 skips redundant login. Otherwise it sends `login debug` once and verifies the
 final prompt. A rejected login is accepted only when that prompt independently

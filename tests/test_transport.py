@@ -16,7 +16,7 @@ from batteryview.transport import SerialTransport
 def test_serial_settings_baud_reopen_and_io(monkeypatch):
     class FakeSerial:
         def __init__(self, port, baudrate, **kwargs):
-            assert port == "COM3" and baudrate == 115200
+            assert port is None and baudrate == 115200
             assert kwargs == {
                 "bytesize": 8,
                 "parity": "N",
@@ -30,11 +30,16 @@ def test_serial_settings_baud_reopen_and_io(monkeypatch):
             self.baudrate = baudrate
             self.in_waiting = 4
             self.operations = []
+            self.port = port
+            self.dtr = True
+            self.rts = True
 
         def close(self):
             self.operations.append("close")
 
         def open(self):
+            assert self.port == "COM3"
+            assert self.dtr is False and self.rts is False
             self.operations.append("open")
 
         def read(self, size):
@@ -50,11 +55,14 @@ def test_serial_settings_baud_reopen_and_io(monkeypatch):
 
     monkeypatch.setattr(serial, "Serial", FakeSerial)
     transport = SerialTransport("COM3")
+    # Each reopen must explicitly restore the inactive line states.
+    transport._serial.dtr = True
+    transport._serial.rts = True
     transport.baudrate = 1200
     assert transport.baudrate == 1200
     assert transport.read() == b"data"
     assert transport.write(b"info\n") == 5
-    assert transport._serial.operations == ["close", "open", b"info\n", "flush"]
+    assert transport._serial.operations == ["open", "close", "open", b"info\n", "flush"]
 
 
 def test_unavailable_port_is_a_connection_error(monkeypatch):
