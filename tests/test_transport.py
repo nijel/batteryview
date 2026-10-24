@@ -84,6 +84,7 @@ def test_installed_cli_event_through_real_serial_transport(tmp_path):
         (b"info\n", identity),
         (b"stat\n", stat),
         (b"data event\n", event),
+        (b"cmdquit\n", "cmdquit\n\r"),
     ]
     errors = []
     stop = threading.Event()

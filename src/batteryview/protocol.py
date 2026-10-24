@@ -10,6 +10,7 @@ from typing import Literal
 
 from .diagnostics import SERIAL_TRACE, command_label, serial_logger
 from .errors import (
+    BatteryViewError,
     CommandCancelled,
     CommandTimeout,
     ConnectionError,
@@ -24,7 +25,7 @@ SHIFT_SEQUENCE = bytes.fromhex("7E 32 30 30 31 34 36 38 32 43 30 30 34 38 35 32 
 CONTINUATION = "Press [Enter] to be continued,other key to exit"
 PROMPT = re.compile(r"(?:^|[\r\n@])pylon(?:_debug)?>(?=$|[\r\n])")
 INVALID = re.compile(r"Invalid command or fail to excute\.?|Invalid command", re.I)
-Boundary = Literal["prompt", "page"]
+Boundary = Literal["prompt", "page", "disconnect"]
 
 
 @dataclass(frozen=True)
@@ -75,11 +76,14 @@ class ConsoleSession:
         self.synchronized = False
         self._needs_resync = False
         self.current_prompt: str | None = None
+        self._closed = False
 
     def connect(
         self, *, baudrate: int = 115200, shift: bool = True, enter_debug: bool = True
     ) -> None:
         with self.lock:
+            if self._closed:
+                raise ConnectionError("Console session is closed")
             logger.debug(
                 "Connecting console baud=%d shift=%s enter_debug=%s", baudrate, shift, enter_debug
             )
@@ -136,6 +140,8 @@ class ConsoleSession:
         if not math.isfinite(wait) or wait <= 0:
             raise ValueError("Timeout must be positive")
         with self.lock:
+            if self._closed:
+                raise ConnectionError("Console session is closed")
             label = command_label(command)
             if self._needs_resync and command:
                 logger.debug("Command blocked command=%s; resynchronization required", label)
@@ -183,10 +189,14 @@ class ConsoleSession:
                 raise UnsupportedCommand(f"Unsupported command: {label!r}", response=response.text)
             return response
 
-    def _receive(self, command: str, *, paginated: bool, timeout: float) -> Response:
+    def _receive(
+        self, command: str, *, paginated: bool, timeout: float, disconnect: bool = False
+    ) -> Response:
         data = bytearray()
         try:
-            return self._read_frame(command, paginated=paginated, timeout=timeout, data=data)
+            return self._read_frame(
+                command, paginated=paginated, timeout=timeout, data=data, disconnect=disconnect
+            )
         except KeyboardInterrupt as exc:
             raise CommandCancelled(
                 f"Interrupted while waiting for {command_label(command)!r}",
@@ -194,7 +204,13 @@ class ConsoleSession:
             ) from exc
 
     def _read_frame(
-        self, command: str, *, paginated: bool, timeout: float, data: bytearray
+        self,
+        command: str,
+        *,
+        paginated: bool,
+        timeout: float,
+        data: bytearray,
+        disconnect: bool = False,
     ) -> Response:
         deadline = time.monotonic() + timeout
         boundary: Boundary | None = None
@@ -231,13 +247,59 @@ class ConsoleSession:
             page_at = text.rfind(CONTINUATION) if paginated else -1
             boundary = None
             quiet_deadline = None
-            if prompts and prompts[-1].start() > page_at:
+            if disconnect:
+                # Original ResponsePattern.Disconnect matches just 'cmdquit',
+                # potentially its echo; a subsequent console prompt is not required.
+                if "cmdquit" in text:
+                    boundary = "disconnect"
+            elif prompts and prompts[-1].start() > page_at:
                 boundary = "prompt"
             elif page_at >= 0:
                 boundary = "page"
             if boundary is not None:
                 quiet_deadline = time.monotonic() + self.settle_time
 
+    def disconnect(self) -> None:
+        """Best-effort vendor disconnect: cmdquit + up to 5 seconds, then close.
+
+        This bypasses the resynchronization guard, like the original disconnect
+        overload, without retrying the last operation. No response enters reports.
+        Cleanup failures are diagnostic only, so an earlier error stays intact.
+        """
+        with self.lock:
+            if self._closed:
+                return
+            started = time.monotonic()
+            logger.debug("Disconnecting console command=cmdquit timeout=5.000s")
+            self.synchronized = False
+            self.current_prompt = None
+            self._needs_resync = True
+            try:
+                self._write(b"cmdquit\n")
+                response = self._receive("cmdquit", paginated=False, timeout=5, disconnect=True)
+                logger.debug(
+                    "Disconnect response matched cmdquit rx_bytes=%d elapsed=%.3fs",
+                    len(response.text),
+                    time.monotonic() - started,
+                )
+            except (BatteryViewError, OSError) as exc:
+                logger.debug(
+                    "Disconnect failed error=%s elapsed=%.3fs; closing port anyway",
+                    type(exc).__name__,
+                    time.monotonic() - started,
+                )
+            finally:
+                try:
+                    self.close()
+                except (BatteryViewError, OSError) as exc:
+                    logger.debug("Port close failed error=%s", type(exc).__name__)
+
     def close(self) -> None:
-        logger.debug("Closing console session")
-        self.transport.close()
+        """Release the transport immediately, including failed connection setup."""
+        with self.lock:
+            if not self._closed:
+                self._closed = True
+                self.synchronized = False
+                self.current_prompt = None
+                logger.debug("Closing console session")
+                self.transport.close()

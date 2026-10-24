@@ -81,7 +81,8 @@ def test_timeout_metadata_retains_context_without_partial_payload(replay, capsys
     assert "TEST_PRIVATE" not in output.err
 
 
-def test_info_then_snapshot_on_console_that_retains_debug_mode(monkeypatch, capsys):
+@pytest.mark.parametrize("exit_debug", [False, True])
+def test_info_then_snapshot_checks_mode_after_disconnect(monkeypatch, capsys, exit_debug):
     class Console:
         debug = False
         commands = []
@@ -111,6 +112,12 @@ def test_info_then_snapshot_on_console_that_retains_debug_mode(monkeypatch, caps
                 )
             elif data == b"pwrsys\n":
                 response = "Invalid command\rpylon_debug>"
+            elif data == b"cmdquit\n":
+                # A later connection must inspect its prompt whether the firmware
+                # leaves debug mode on disconnect or only acknowledges the command.
+                if exit_debug:
+                    Console.debug = False
+                response = "cmdquit\n"
             else:
                 raise AssertionError("Unexpected synthetic console command")
             self.pending = response.encode("ascii")
@@ -134,8 +141,10 @@ def test_info_then_snapshot_on_console_that_retains_debug_mode(monkeypatch, caps
             assert client.info().name == "SYNTHETIC_MODEL"
         with BatteryClient("SYNTHETIC_PORT", shift=False) as client:
             assert client.snapshot().modules[0].voltage_v == 50
-    assert Console.commands.count(b"login debug\n") == 1
-    assert "already in debug mode; skipping login debug" in capsys.readouterr().err
+    assert Console.commands.count(b"login debug\n") == (2 if exit_debug else 1)
+    assert Console.commands.count(b"cmdquit\n") == 2
+    if not exit_debug:
+        assert "already in debug mode; skipping login debug" in capsys.readouterr().err
 
 
 def test_failed_login_logs_final_prompt_without_payload(replay, monkeypatch, capsys):

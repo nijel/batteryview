@@ -11,7 +11,7 @@ from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .errors import ProtocolError, ResetRecoveryError, UnsupportedCommand
+from .errors import BatteryViewError, ProtocolError, ResetRecoveryError, UnsupportedCommand
 from .models import DeviceInfo, ReportResult, Snapshot
 from .parsers import parse_getpwr, parse_info, parse_pwr, recommended_currents, record_count
 from .protocol import ConsoleSession, Response
@@ -62,7 +62,10 @@ class BatteryClient:
             session.connect(baudrate=self.baudrate, shift=self.shift)
             self._select_module(session)
         except BaseException:
-            session.close()
+            try:
+                session.close()
+            except (BatteryViewError, OSError) as exc:
+                logger.debug("Setup cleanup failed error=%s", type(exc).__name__)
             raise
         self._session = session
         return self
@@ -74,9 +77,11 @@ class BatteryClient:
 
     def close(self) -> None:
         if self._session is not None:
-            self._session.close()
-            if not self._injected:
-                self._session = None
+            try:
+                self._session.disconnect()
+            finally:
+                if not self._injected:
+                    self._session = None
 
     def __enter__(self) -> "BatteryClient":
         return self.connect()

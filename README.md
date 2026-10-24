@@ -30,6 +30,15 @@ skips redundant login. Otherwise it sends `login debug` once and verifies the
 final prompt. A rejected login is accepted only when that prompt independently
 confirms debug mode; a base prompt or timeout still fails the connection.
 
+On normal client/context-manager exit, the client follows BatteryView's disconnect
+sequence: send `cmdquit` with LF, wait up to five seconds for received text
+containing `cmdquit` (possibly its echo), then close the serial port. No subsequent
+prompt is required. Timeouts and serial errors during disconnect are diagnostic
+only: the port is still closed, and an earlier operation error is preserved.
+The disconnect response is excluded from report files. Repeated `close()` calls
+do not send additional commands. Failed connection setup releases the port
+immediately without attempting a console command.
+
 ## Pylontech reports
 
 ```sh
@@ -110,6 +119,10 @@ The client is synchronous and serializes operations on a shared console session.
 separate mutating workflow. Exceptions derive from `BatteryViewError`;
 `CommandTimeout`, `UnsupportedCommand`, and `ProtocolError` retain any partial
 response. `ResetRecoveryError` exposes `recovery_path`.
+
+`BatteryClient.close()` performs the same disconnect as context-manager exit.
+There are no background polling tasks or queued report writes to drain: operations
+share a session lock, and report responses are flushed before their methods return.
 
 ## Diagnostic logging
 

@@ -66,6 +66,7 @@ class ScriptedSession:
         self.lock = threading.RLock()
         self.calls = []
         self.reconnects = []
+        self.disconnected = False
 
     def exchange(self, command, **kwargs):
         self.calls.append((command, kwargs))
@@ -80,3 +81,6 @@ class ScriptedSession:
 
     def close(self):
         pass
+
+    def disconnect(self):
+        self.disconnected = True

@@ -57,6 +57,34 @@ After a timeout, the session requires explicit prompt resynchronization before
 another nonempty command. It does not automatically repeat a command whose
 outcome is unknown.
 
+## Disconnect button
+
+Both the menu and toolbar Disconnect buttons queue a message handled by
+`MsgBackgroundWorker.OnDisconnectBatMangeSystems`. It disables scan scheduling,
+waits up to ten seconds for pending scan rows to be saved when its queue is
+nonempty, clears pending messages, and stops application logging.
+
+With `IsNeedCmdQuit="true"` (the bundled connection setting), it then invokes
+`Send("cmdquit", ResponsePattern.Disconnect, 5)`. That overload sends LF through
+`SerialPort.WriteLine` and waits up to five seconds. The disconnect regex is just
+`cmdquit`, so an echo suffices; it does not verify a new prompt or operating mode.
+The port is closed/disposed in a finally block even after a command error or
+timeout. The separate shutdown operation sends `shut` twice; disconnect sends no
+shutdown, reset, or EEPROM command.
+
+The Python client performs this command and wait on `BatteryClient.close()` and
+context-manager exit, using a separate disconnect boundary that does not require
+a prompt. It sends `cmdquit` once even if the previous command left framing
+unsynchronized, without repeating the previous command or adding synchronization
+traffic. Disconnect/port-close errors are logged without masking an earlier
+failure, and repeated closes are idempotent. Failed connection setup uses the
+low-level `ConsoleSession.close()` to release the port immediately.
+
+Python operations already share a synchronous session lock, and report writes are
+flushed before their methods return. There is no background scan queue requiring
+an additional ten-second drain wait. Disconnect responses are not vendor report
+content; they are visible in explicitly enabled serial tracing.
+
 ## Report writer
 
 `DataStorage.SaveLogDataToTxt` opens a new or appended file and constructs a

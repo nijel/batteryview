@@ -29,6 +29,7 @@ def command_label(command: str) -> str:
         "trst",
         "setlowcfg",
         "tbar",
+        "cmdquit",
     }
     if parts[0] not in known:
         return "<command>"
