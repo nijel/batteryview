@@ -286,3 +286,60 @@ def test_watch_count_and_interval(monkeypatch):
     assert list(client.watch(count=2)) == ["snapshot", "snapshot"]
     with pytest.raises(ValueError):
         next(client.watch(interval=0))
+
+
+# Constructed sparse rack: unused slots are placeholders, not malformed readings.
+PWR_WITH_ABSENT = (
+    "pwr\n\r@\r\n"
+    "Power Volt Curr Tempr Tlow Thigh Vlow Vhigh Base.St Volt.St Curr.St Temp.St Coulomb Time B.V.St B.T.St\r\n"
+    "1 50000 -2000 20000 19000 21000 3100 3200 Dischg Normal Normal Normal 50% 00-01-01 00:00:00 Normal Normal\r\n"
+    "2 - - - - - - - Absent - - - - - - -\r\n"
+    "3 - - - - - - - Absent - - - - - - -\r\n"
+    "4 52000 -1000 22000 21000 23000 3200 3300 Dischg Normal Normal Normal 60% 00-01-01 00:00:00 Normal Normal\r\n"
+    "\rpylon_debug>"
+)
+
+
+@pytest.mark.parametrize("header", ["Power", "No"])
+def test_pwr_absent_slots_are_not_readings_or_alarms(header, caplog):
+    with caplog.at_level("DEBUG", logger="batteryview.parsers"):
+        modules = parse_pwr(PWR_WITH_ABSENT.replace("Power Volt", f"{header} Volt"))
+    assert [m.address for m in modules] == [1, 4]
+    assert [m.voltage_v for m in modules] == [50, 52]
+    assert not any(a.code == "Absent" for m in modules for a in m.alarms)
+    assert modules[1].raw["Time"] == "00-01-01 00:00:00"
+    assert "module_count=2 absent_count=2" in caplog.text
+
+
+def test_pwr_absent_filter_does_not_hide_malformed_present_module():
+    text = PWR_WITH_ABSENT.replace("4 52000", "4 -")
+    with pytest.raises(ProtocolError, match="voltage") as error:
+        parse_pwr(text)
+    assert error.value.response == text
+
+
+def test_pwr_all_absent_is_an_explicit_failure():
+    text = "Power Volt Curr Tempr Base.St\r\n1 - - - Absent\r\n2 - - - Absent"
+    with pytest.raises(ProtocolError, match="no present modules"):
+        parse_pwr(text)
+
+
+@pytest.mark.parametrize("mode", ["auto", "parallel"])
+def test_sparse_snapshot_never_queries_absent_slots_and_retains_raw_table(mode):
+    exchanges = [("getpwr", Response(GETPWR, "prompt"))] if mode == "auto" else []
+    exchanges.append(("pwr", Response(PWR_WITH_ABSENT, "prompt")))
+    for address in (1, 4):
+        exchanges.extend(
+            [
+                (f"getpwr {address}", Response(GETPWR, "prompt")),
+                (f"pwrsys {address}", Response("Recommend chg current : 10000", "prompt")),
+            ]
+        )
+    exchanges.append(("pwrsys", Response("system Recommend chg current : 20000", "prompt")))
+    session = ScriptedSession(exchanges)
+    snapshot = BatteryClient(session=session, profile="generic", monitoring_mode=mode).snapshot()
+    assert [m.address for m in snapshot.modules] == [1, 4]
+    assert snapshot.raw_responses["pwr"] == PWR_WITH_ABSENT
+    assert snapshot.system.current_a == -4
+    assert snapshot.system.voltage_v == 50
+    assert not session.exchanges

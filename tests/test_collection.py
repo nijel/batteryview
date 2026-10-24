@@ -426,3 +426,35 @@ def test_connection_setup_failure_does_not_create_collection_artifacts(
     assert not directory.exists()
     out, err = capsys.readouterr()
     assert not out and "synthetic connection failure" in err
+
+
+def test_collection_snapshot_accepts_rack_with_unused_module_slots(tmp_path, replay):
+    from test_monitoring import GETPWR, PWR_WITH_ABSENT
+
+    exchanges = collection_exchanges()
+    # Preserve the identity and report steps; replace only the snapshot exchange.
+    snapshot_at = next(i for i, (cmd, _) in enumerate(exchanges) if cmd == b"getpwr\n")
+    exchanges = exchanges[:snapshot_at] + [
+        (b"getpwr\n", GETPWR),
+        (b"pwr\n", PWR_WITH_ABSENT),
+    ]
+    for address in (1, 4):
+        exchanges.extend(
+            [
+                (f"getpwr {address}\n".encode(), GETPWR),
+                (
+                    f"pwrsys {address}\n".encode(),
+                    response("pwrsys", "Recommend chg current : 10000"),
+                ),
+            ]
+        )
+    exchanges.append((b"pwrsys\n", response("pwrsys", "system Recommend chg current : 20000")))
+    session, wire = replay(exchanges)
+    result = BatteryClient(session=session).collect(tmp_path / "support")
+    manifest = read_manifest(result)
+    assert result.complete and all(s["status"] == "complete" for s in manifest["steps"])
+    snapshot_path = result.directory / manifest["steps"][-1]["artifact"]
+    snapshot = json.loads(snapshot_path.read_text())
+    assert [m["address"] for m in snapshot["modules"]] == [1, 4]
+    assert snapshot["raw_responses"]["pwr"] == PWR_WITH_ABSENT
+    assert not wire.exchanges

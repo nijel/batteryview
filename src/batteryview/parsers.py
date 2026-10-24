@@ -152,8 +152,15 @@ def module_from_row(row: dict[str, str]) -> ModuleReading:
 def parse_pwr(text: str) -> list[ModuleReading]:
     rows = parse_table(text)
     if rows:
-        logger.debug("Parsed pwr format=table module_count=%d", len(rows))
-        modules = [module_from_row(row) for row in rows]
+        present = [row for row in rows if row.get("Base.St") != "Absent"]
+        logger.debug(
+            "Parsed pwr format=table module_count=%d absent_count=%d",
+            len(present),
+            len(rows) - len(present),
+        )
+        if not present:
+            raise ProtocolError("pwr table contains no present modules", response=text)
+        modules = [module_from_row(row) for row in present]
         if any(m.address is None or m.voltage_v is None for m in modules):
             raise ProtocolError("pwr table has no recognizable address or voltage", response=text)
         return modules

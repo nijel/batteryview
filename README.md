@@ -221,6 +221,9 @@ parallel mode requires a module table and addressed detail reads. An explicit
 `--module` always uses addressed reads and does not depend on a numbered login.
 Unsupported optional extensions are retained as raw responses without discarding
 valid primary readings; malformed replies and timeouts still fail.
+Module-table slots explicitly marked `Absent` are excluded from detail queries
+and aggregates. Their original rows remain in the raw `pwr` response; missing
+voltage in a present module still fails validation.
 
 The first monitoring call reads identity to select a bundled native profile.
 `--profile` (or the library's `profile=`) overrides this selection and skips that
