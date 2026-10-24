@@ -1,10 +1,23 @@
 """Parsers use labels and column headers, rather than .NET variable lookbehinds."""
 
+import logging
 import re
 from dataclasses import replace
 
 from .errors import ProtocolError
 from .models import Alarm, CellReading, DeviceInfo, ModuleReading
+
+logger = logging.getLogger(__name__)
+
+PWR_STATUS_LABELS = {
+    "Basic Status": "Base.St",
+    "Volt Status": "Volt.St",
+    "Current Status": "Curr.St",
+    "Tmpr. Status": "Temp.St",
+    "Coul. Status": "Coul.St",
+    "Soh. Status": "Soh.St",
+    "Heater Status": "H.St",
+}
 
 ERROR_BITS = [
     "Input RV",
@@ -128,9 +141,45 @@ def module_from_row(row: dict[str, str]) -> ModuleReading:
 
 def parse_pwr(text: str) -> list[ModuleReading]:
     rows = parse_table(text)
-    if not rows:
-        raise ProtocolError("pwr response has no recognizable module table", response=text)
-    return [module_from_row(row) for row in rows]
+    if rows:
+        logger.debug("Parsed pwr format=table module_count=%d", len(rows))
+        return [module_from_row(row) for row in rows]
+
+    # A directly connected module may report a labeled summary rather than a
+    # rack table. 'Power N' identifies that module, not the number of modules.
+    lines = text.splitlines()
+    headers = []
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"\s*Power\s+([0-9]+)\s*", line)
+        if match:
+            headers.append((index, match[1]))
+    if not headers:
+        raise ProtocolError(
+            "pwr response has no recognizable module table or labeled summary", response=text
+        )
+    modules = []
+    for block, (start, address) in enumerate(headers):
+        end = headers[block + 1][0] if block + 1 < len(headers) else len(lines)
+        fields = key_values("\n".join(lines[start + 1 : end]))
+        voltage = number(fields.get("Voltage"), 1000)
+        if voltage is None:
+            raise ProtocolError("Labeled pwr summary has no recognizable voltage", response=text)
+        states = {key: fields[label] for label, key in PWR_STATUS_LABELS.items() if label in fields}
+        modules.append(
+            ModuleReading(
+                address=int(address),
+                voltage_v=voltage,
+                current_a=number(fields.get("Current"), 1000),
+                temperature_c=number(fields.get("Temperature"), 1000),
+                soc_pct=number(fields.get("Coulomb")),
+                capacity_ah=number(fields.get("Total Coulomb"), 1000),
+                states=states,
+                alarms=_alarms(states, "module"),
+                raw={**fields, "Power": address},
+            )
+        )
+    logger.debug("Parsed pwr format=labeled module_count=%d", len(modules))
+    return modules
 
 
 def parse_getpwr(text: str, *, address: int | None = None) -> ModuleReading:

@@ -36,6 +36,26 @@ def test_disconnect_timeout_uses_five_seconds_and_always_closes(replay, monkeypa
     assert "Disconnect failed error=CommandTimeout" in capsys.readouterr().err
 
 
+def test_rejected_cmdquit_is_logged_without_changing_echo_matching_or_cleanup(replay, capsys):
+    session, transport = replay(
+        [
+            (
+                b"cmdquit\n",
+                "cmdquit\n\r@\r\r\nUnknown command 'cmdquit' - try 'help'\r\n\rpylon_debug>",
+            ),
+        ],
+        chunk_size=1,
+    )
+    with configure_logging(debug=True):
+        session.disconnect()
+    output = capsys.readouterr()
+    assert "Disconnect command=cmdquit rejected by firmware; closing port anyway" in output.err
+    assert "Disconnect response matched" not in output.err
+    assert "Unknown command" not in output.err
+    assert transport.closed and transport.writes == [b"cmdquit\n"]
+    assert not output.out
+
+
 def test_disconnect_prompt_alone_does_not_acknowledge_cmdquit(replay, monkeypatch, capsys):
     session, transport = replay([(b"cmdquit\n", "\rpylon>")])
     # Exercise the actual reader with an accelerated monotonic clock. The

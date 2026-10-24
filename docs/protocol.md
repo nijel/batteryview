@@ -72,6 +72,11 @@ The port is closed/disposed in a finally block even after a command error or
 timeout. The separate shutdown operation sends `shut` twice; disconnect sends no
 shutdown, reset, or EEPROM command.
 
+Some firmware responds with `Unknown command` when sent `cmdquit`. The Python
+client classifies that response as a rejection and logs it explicitly, while
+retaining the original echo-based wait and unconditional port cleanup. A received
+echo therefore does not establish that console mode actually ended.
+
 The Python client performs this command and wait on `BatteryClient.close()` and
 context-manager exit, using a separate disconnect boundary that does not require
 a prompt. It sends `cmdquit` once even if the previous command left framing
@@ -158,6 +163,23 @@ of the saved recovery state; there is no automatic resume command.
 plus `pwr` for the module table. Extended queries include `pwr N`, `pwrsys N`,
 and system `pwrsys`; some are optional or disabled by configuration. Module
 login uses `login N debug` with one-based module numbering.
+
+The Python `pwr` parser accepts both tables and labeled summaries headed by
+`Power N`. The latter identifies the connected module's reported address, not an
+installation size. Labels include `Voltage`, `Current`, `Temperature`, `Coulomb`,
+`Total Coulomb`, and status fields. Voltages, currents, temperatures, and capacities
+are divided by 1000; percent SOC is unscaled. Status labels are normalized to the
+existing state keys, while original fields, protection labels, and event masks
+remain in `raw`. A labeled block requires a numeric address and recognizable
+voltage; optional missing fields remain absent. Its event masks are not assumed
+to share the hash-format error-code bit mapping.
+
+A single returned module uses bare `getpwr` and `pwrsys` unless an explicit
+`--module` was selected, independently of that module's reported address. No
+preceding addresses are enumerated. Multiple returned modules retain addressed
+queries. The snapshot merge keeps capacity from `pwr` if detailed reads omit it.
+`Unknown command` replies are recognized as unsupported; optional `pwrsys` can
+then be omitted without losing the other snapshot readings.
 
 `RegoutConfig.xml` describes voltage/current/temperature scaling by 1000.
 `getpwr` begins with eight hash-delimited fields: voltage, current, temperature,

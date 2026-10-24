@@ -95,6 +95,28 @@ def test_unsupported_can_be_retained_by_reset_script(replay):
     assert session.exchange("datalist misc 0", allow_unsupported=True).unsupported
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Unknown command 'pwrsys' - try 'help'\r\npylon_debug>",
+        "pwrsys\n\r@\r\r\nUnknown command 'pwrsys' - try 'help'\r\n\rpylon_debug>",
+        "\r\n  UNKNOWN COMMAND: pwrsys\r\npylon_debug>",
+    ],
+)
+def test_unknown_command_is_classified_as_unsupported(replay, text):
+    session, _ = replay([(b"pwrsys\n", text)], chunk_size=1)
+    with pytest.raises(UnsupportedCommand) as error:
+        session.exchange("pwrsys")
+    assert error.value.response == text
+    assert session.synchronized
+
+
+def test_unknown_command_words_in_a_field_are_not_an_error():
+    assert not Response(
+        "Description : Unknown command behavior\rpylon_debug>", "prompt"
+    ).unsupported
+
+
 def test_response_limit(replay):
     session, _ = replay([(b"stat\n", "x" * 100)])
     session.max_response_bytes = 10

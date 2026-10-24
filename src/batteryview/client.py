@@ -335,7 +335,9 @@ class BatteryClient:
                 module = replace(
                     module,
                     cells=detail.cells,
-                    capacity_ah=detail.capacity_ah,
+                    capacity_ah=detail.capacity_ah
+                    if detail.capacity_ah is not None
+                    else module.capacity_ah,
                     states=states,
                     raw={**module.raw, **detail.raw},
                     alarms=list(

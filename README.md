@@ -35,6 +35,8 @@ sequence: send `cmdquit` with LF, wait up to five seconds for received text
 containing `cmdquit` (possibly its echo), then close the serial port. No subsequent
 prompt is required. Timeouts and serial errors during disconnect are diagnostic
 only: the port is still closed, and an earlier operation error is preserved.
+Some firmware rejects `cmdquit`; diagnostics report that rejection explicitly
+even when its echo matches. An echo alone does not confirm that console mode ended.
 The disconnect response is excluded from report files. Repeated `close()` calls
 do not send additional commands. Failed connection setup releases the port
 immediately without attempting a console command.
@@ -96,11 +98,21 @@ and raw responses. CSV has separate `module` and `cell` rows with explicit units
 Missing values are empty/null, not zero. Known alarms have `warning` or `error`
 severity; unfamiliar state values are preserved with `unknown` severity.
 
-Chained modules are discovered through `pwr`; detailed reads use `getpwr N`.
-Monitoring parsers support the recovered hash-delimited `getpwr` format and
-labelled responses with cell tables. These paths have synthetic tests but no
-live-monitoring recording yet. Unsupported optional `pwrsys` queries do not
-discard other readings; timeouts and malformed core responses stop collection.
+`pwr` can return a module table or a labeled summary headed `Power N`. The header
+reports the connected module's address, not the number of installed modules.
+Labeled summaries support voltage, signed current, temperature, SOC, capacity,
+and status fields; unknown fields remain available in `raw`.
+
+For a single returned module without `--module`, detailed reads use bare `getpwr`
+and `pwrsys` on the connected console, even when its reported address is greater
+than one. Multiple returned modules or explicit `--module N` selection use
+addressed queries. Monitoring supports hash-delimited `getpwr` responses and
+labeled responses with cell tables. Capacity from `pwr` is retained if the
+detailed response omits it. Full snapshots still require hardware verification.
+
+Unsupported optional `pwrsys` queries, including firmware replies beginning with
+`Unknown command`, do not discard other readings. Timeouts and malformed core
+responses stop collection.
 
 ## Python API
 

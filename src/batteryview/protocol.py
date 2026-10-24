@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 SHIFT_SEQUENCE = bytes.fromhex("7E 32 30 30 31 34 36 38 32 43 30 30 34 38 35 32 30 46 43 43 33 0D")
 CONTINUATION = "Press [Enter] to be continued,other key to exit"
 PROMPT = re.compile(r"(?:^|[\r\n@])pylon(?:_debug)?>(?=$|[\r\n])")
-INVALID = re.compile(r"Invalid command or fail to excute\.?|Invalid command", re.I)
+INVALID = re.compile(
+    r"Invalid command or fail to excute\.?|Invalid command|(?:^|[\r\n])[ \t]*Unknown command\b",
+    re.I,
+)
 Boundary = Literal["prompt", "page", "disconnect"]
 
 
@@ -277,11 +280,18 @@ class ConsoleSession:
             try:
                 self._write(b"cmdquit\n")
                 response = self._receive("cmdquit", paginated=False, timeout=5, disconnect=True)
-                logger.debug(
-                    "Disconnect response matched cmdquit rx_bytes=%d elapsed=%.3fs",
-                    len(response.text),
-                    time.monotonic() - started,
-                )
+                if response.unsupported:
+                    logger.debug(
+                        "Disconnect command=cmdquit rejected by firmware; closing port anyway rx_bytes=%d elapsed=%.3fs",
+                        len(response.text),
+                        time.monotonic() - started,
+                    )
+                else:
+                    logger.debug(
+                        "Disconnect response matched cmdquit rx_bytes=%d elapsed=%.3fs",
+                        len(response.text),
+                        time.monotonic() - started,
+                    )
             except (BatteryViewError, OSError) as exc:
                 logger.debug(
                     "Disconnect failed error=%s elapsed=%.3fs; closing port anyway",
