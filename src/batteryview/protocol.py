@@ -1,5 +1,6 @@
 """BatteryView's text-console framing, independent of OS and serial read boundaries."""
 
+import logging
 import math
 import re
 import threading
@@ -7,6 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+from .diagnostics import SERIAL_TRACE, command_label, serial_logger
 from .errors import (
     CommandCancelled,
     CommandTimeout,
@@ -15,6 +17,8 @@ from .errors import (
     UnsupportedCommand,
 )
 from .transport import Transport
+
+logger = logging.getLogger(__name__)
 
 SHIFT_SEQUENCE = bytes.fromhex("7E 32 30 30 31 34 36 38 32 43 30 30 34 38 35 32 30 46 43 43 33 0D")
 CONTINUATION = "Press [Enter] to be continued,other key to exit"
@@ -31,6 +35,12 @@ class Response:
     @property
     def unsupported(self) -> bool:
         return bool(INVALID.search(self.text))
+
+    @property
+    def prompt(self) -> str | None:
+        """Final recognized console prompt, never an earlier or echoed substring."""
+        matches = list(PROMPT.finditer(self.text))
+        return matches[-1][0].lstrip("\r\n@") if matches else None
 
 
 class ConsoleSession:
@@ -64,30 +74,51 @@ class ConsoleSession:
         self.lock = threading.RLock()
         self.synchronized = False
         self._needs_resync = False
+        self.current_prompt: str | None = None
 
     def connect(
         self, *, baudrate: int = 115200, shift: bool = True, enter_debug: bool = True
     ) -> None:
         with self.lock:
+            logger.debug(
+                "Connecting console baud=%d shift=%s enter_debug=%s", baudrate, shift, enter_debug
+            )
             if shift:
+                logger.debug("Switching to console mode at baud=1200")
                 self.transport.baudrate = 1200
                 self._write(SHIFT_SEQUENCE)
                 time.sleep(0.5)
             self.transport.baudrate = baudrate
             time.sleep(0.5)
-            self.resynchronize(timeout=max(self.timeout, 15))
+            response = self.resynchronize(timeout=max(self.timeout, 15))
             if enter_debug:
-                response = self.exchange("login debug")
-                if "pylon_debug>" not in response.text:
-                    raise ProtocolError("Console did not enter debug mode", response=response.text)
+                if response.prompt == "pylon_debug>":
+                    logger.debug("Console already in debug mode; skipping login debug")
+                else:
+                    logger.debug("Entering debug mode from prompt=%s", response.prompt)
+                    response = self.exchange("login debug", allow_unsupported=True)
+                    if response.prompt != "pylon_debug>":
+                        if response.unsupported:
+                            raise UnsupportedCommand(
+                                "Unsupported command: 'login debug'; console remains outside debug mode",
+                                response=response.text,
+                            )
+                        raise ProtocolError(
+                            "Console did not enter debug mode", response=response.text
+                        )
+                    if response.unsupported:
+                        logger.debug("Login rejected but final prompt confirms debug mode")
+            logger.debug("Console connection ready prompt=%s", self.current_prompt)
 
     def _write(self, data: bytes) -> None:
+        serial_logger.log(SERIAL_TRACE, "TX %r", data)
         if self.transport.write(data) != len(data):
             raise ConnectionError("Incomplete serial write; command outcome is unknown")
 
     def resynchronize(self, *, timeout: float | None = None) -> Response:
         """Request a prompt without repeating the previous command."""
         with self.lock:
+            logger.debug("Resynchronizing console")
             return self.exchange("", timeout=timeout)
 
     def exchange(
@@ -105,20 +136,51 @@ class ConsoleSession:
         if not math.isfinite(wait) or wait <= 0:
             raise ValueError("Timeout must be positive")
         with self.lock:
+            label = command_label(command)
             if self._needs_resync and command:
+                logger.debug("Command blocked command=%s; resynchronization required", label)
                 raise ProtocolError(
                     "Console state is unknown; call resynchronize() before sending another command"
                 )
             self.synchronized = False
+            self.current_prompt = None
             self._needs_resync = True
-            self._write(command.encode("ascii") + terminator)
-            response = self._receive(command, paginated=paginated, timeout=wait)
-            self.synchronized = response.boundary == "prompt"
-            self._needs_resync = False
-            if response.unsupported and not allow_unsupported:
-                raise UnsupportedCommand(
-                    f"Unsupported command: {command!r}", response=response.text
+            started = time.monotonic()
+            data = command.encode("ascii") + terminator
+            logger.debug(
+                "Command start command=%s tx_bytes=%d terminator=%r timeout=%.3fs paginated=%s",
+                label,
+                len(data),
+                terminator,
+                wait,
+                paginated,
+            )
+            try:
+                self._write(data)
+                response = self._receive(command, paginated=paginated, timeout=wait)
+            except BaseException as exc:
+                logger.debug(
+                    "Command failed command=%s error=%s elapsed=%.3fs partial_bytes=%d",
+                    label,
+                    type(exc).__name__,
+                    time.monotonic() - started,
+                    len(getattr(exc, "response", "")),
                 )
+                raise
+            self.synchronized = response.boundary == "prompt"
+            self.current_prompt = response.prompt if self.synchronized else None
+            self._needs_resync = False
+            logger.debug(
+                "Command complete command=%s boundary=%s prompt=%s rx_bytes=%d elapsed=%.3fs unsupported=%s",
+                label,
+                response.boundary,
+                response.prompt,
+                len(response.text),
+                time.monotonic() - started,
+                response.unsupported,
+            )
+            if response.unsupported and not allow_unsupported:
+                raise UnsupportedCommand(f"Unsupported command: {label!r}", response=response.text)
             return response
 
     def _receive(self, command: str, *, paginated: bool, timeout: float) -> Response:
@@ -127,7 +189,7 @@ class ConsoleSession:
             return self._read_frame(command, paginated=paginated, timeout=timeout, data=data)
         except KeyboardInterrupt as exc:
             raise CommandCancelled(
-                f"Interrupted while waiting for {command!r}",
+                f"Interrupted while waiting for {command_label(command)!r}",
                 response=data.decode("ascii", errors="replace"),
             ) from exc
 
@@ -145,7 +207,7 @@ class ConsoleSession:
                 if boundary is not None:
                     return Response(data.decode("ascii", errors="replace"), boundary)
                 raise CommandTimeout(
-                    f"Timeout waiting for {command!r}; command was not retried",
+                    f"Timeout waiting for {command_label(command)!r}; command was not retried",
                     response=data.decode("ascii", errors="replace"),
                 )
             try:
@@ -156,10 +218,11 @@ class ConsoleSession:
                 ) from exc
             if not chunk:
                 continue
+            serial_logger.log(SERIAL_TRACE, "RX %r", chunk)
             data.extend(chunk)
             if len(data) > self.max_response_bytes:
                 raise ProtocolError(
-                    f"Response to {command!r} exceeded {self.max_response_bytes} bytes",
+                    f"Response to {command_label(command)!r} exceeded {self.max_response_bytes} bytes",
                     response=data.decode("ascii", errors="replace"),
                 )
             text = data.decode("ascii", errors="replace")
@@ -176,4 +239,5 @@ class ConsoleSession:
                 quiet_deadline = time.monotonic() + self.settle_time
 
     def close(self) -> None:
+        logger.debug("Closing console session")
         self.transport.close()

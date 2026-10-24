@@ -7,7 +7,7 @@ from batteryview.errors import (
     ProtocolError,
     UnsupportedCommand,
 )
-from batteryview.protocol import CONTINUATION
+from batteryview.protocol import CONTINUATION, Response
 
 
 @pytest.mark.parametrize("chunk_size", [1, 2, 7, 65536])
@@ -132,3 +132,56 @@ def test_connection_handshake(replay, monkeypatch):
     session.connect()
     assert transport.baudrate == 115200
     assert not transport.exchanges
+
+
+@pytest.mark.parametrize(
+    "initial,login_response,expected_error",
+    [
+        ("\rpylon_debug>", None, None),
+        ("\rpylon>", "\rpylon_debug>", None),
+        ("\rpylon>", "Invalid command\rpylon_debug>", None),
+        ("\rpylon>", "Invalid command\rpylon>", UnsupportedCommand),
+        ("\rpylon>", "\rpylon>", ProtocolError),
+        ("\rpylon_debug>\rpylon>", "Invalid command\rpylon>", UnsupportedCommand),
+        ("\rpylon>", "\rpylon_debug>\rpylon>", ProtocolError),
+    ],
+)
+def test_connect_uses_final_prompt(replay, monkeypatch, initial, login_response, expected_error):
+    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    exchanges = [(b"\n", initial)]
+    if login_response is not None:
+        exchanges.append((b"login debug\n", login_response))
+    session, transport = replay(exchanges, chunk_size=65536)
+    session.settle_time = 0
+    if expected_error:
+        with pytest.raises(expected_error):
+            session.connect(shift=False)
+    else:
+        session.connect(shift=False)
+        assert session.current_prompt == "pylon_debug>"
+    assert not transport.exchanges
+    if login_response is None:
+        assert transport.writes == [b"\n"]
+
+
+def test_reconnect_without_debug_keeps_script_login_explicit(replay, monkeypatch):
+    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    session, transport = replay([(b"\n", "\rpylon>")])
+    session.settle_time = 0
+    session.connect(shift=False, enter_debug=False)
+    assert session.current_prompt == "pylon>"
+    assert transport.writes == [b"\n"]
+
+
+def test_login_timeout_is_not_ignored(replay, monkeypatch):
+    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    session, transport = replay([(b"\n", "\rpylon>"), (b"login debug\n", "partial")], timeout=0.005)
+    session.settle_time = 0
+    with pytest.raises(CommandTimeout):
+        session.connect(shift=False)
+    assert transport.writes.count(b"login debug\n") == 1
+
+
+def test_response_prompt_does_not_accept_echoed_substrings():
+    assert Response("Device name: notpylon_debug>", "prompt").prompt is None
+    assert Response("\rpylon_debug>\r\npylon>", "prompt").prompt == "pylon>"

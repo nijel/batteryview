@@ -1,5 +1,7 @@
 """Portable Pylontech console library."""
 
+import logging
+
 from .client import BatteryClient
 from .errors import (
     BatteryViewError,
@@ -11,6 +13,8 @@ from .errors import (
     UnsupportedCommand,
 )
 from .models import Alarm, CellReading, DeviceInfo, ModuleReading, ReportResult, Snapshot
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     "Alarm",

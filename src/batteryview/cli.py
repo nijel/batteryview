@@ -3,13 +3,17 @@
 import argparse
 import csv
 import json
+import logging
 import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import TextIO
 
 from . import BatteryClient, BatteryViewError, CommandCancelled, Snapshot
+from .diagnostics import configure_logging
 from .transport import list_ports
+
+logger = logging.getLogger(__name__)
 
 CSV_FIELDS = [
     "timestamp",
@@ -44,12 +48,32 @@ def _count(value: str) -> int:
 
 
 def parser() -> argparse.ArgumentParser:
+    diagnostics = argparse.ArgumentParser(add_help=False)
+    diagnostics.add_argument(
+        "--debug",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="log command metadata and connection diagnostics",
+    )
+    diagnostics.add_argument(
+        "--trace-serial",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="include raw serial bytes (may contain private battery data); implies --debug",
+    )
+    diagnostics.add_argument(
+        "--log-file",
+        type=Path,
+        default=argparse.SUPPRESS,
+        help="write diagnostics to a new UTF-8 file instead of stderr; implies --debug",
+    )
     root = argparse.ArgumentParser(
         prog="batteryview",
         description="Pylontech console reports and monitoring",
+        parents=[diagnostics],
     )
     sub = root.add_subparsers(dest="command", required=True)
-    ports = sub.add_parser("ports", help="list available serial ports")
+    ports = sub.add_parser("ports", help="list available serial ports", parents=[diagnostics])
     ports.add_argument("--format", choices=["json", "csv"], default="json")
     for name, help_text in [
         ("info", "read device identity"),
@@ -59,7 +83,7 @@ def parser() -> argparse.ArgumentParser:
         ("event", "save a BatteryView-compatible Event transcript"),
         ("reset-soc", "execute EEPROM clear, reset, and barcode restoration; save transcript"),
     ]:
-        command = sub.add_parser(name, help=help_text)
+        command = sub.add_parser(name, help=help_text, parents=[diagnostics])
         command.add_argument("--port", required=True, help="e.g. COM3 or /dev/ttyUSB0")
         command.add_argument(
             "--baud", type=_count, default=115200, help="console rate (default: 115200)"
@@ -125,6 +149,19 @@ def _write_snapshot(snapshot: Snapshot, output: TextIO, csv_writer: csv.DictWrit
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        with configure_logging(
+            debug=getattr(args, "debug", False),
+            trace_serial=getattr(args, "trace_serial", False),
+            log_file=getattr(args, "log_file", None),
+        ):
+            return _run(args)
+    except OSError as exc:
+        print(f"batteryview: Cannot configure diagnostic logging: {exc}", file=sys.stderr)
+        return 1
+
+
+def _run(args: argparse.Namespace) -> int:
+    try:
         if args.command == "ports":
             ports = list_ports()
             if args.format == "json":
@@ -178,9 +215,11 @@ def main(argv: list[str] | None = None) -> int:
                     output.close()
         return 0
     except (KeyboardInterrupt, CommandCancelled):
+        logger.debug("Operation interrupted")
         print("Interrupted; any partial report has been retained.", file=sys.stderr)
         return 130
     except (BatteryViewError, OSError, ValueError) as exc:
+        logger.debug("Operation failed command=%s error=%s", args.command, type(exc).__name__)
         print(f"batteryview: {exc}", file=sys.stderr)
         return 1
 

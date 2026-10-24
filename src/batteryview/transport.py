@@ -1,8 +1,11 @@
 """Serial I/O kept separate from console framing for replay and future transports."""
 
+import logging
 from typing import Protocol
 
 from .errors import ConnectionError
+
+logger = logging.getLogger(__name__)
 
 
 class Transport(Protocol):
@@ -18,6 +21,11 @@ class SerialTransport:
         import serial
 
         try:
+            logger.debug(
+                "Opening serial port baud=%d data_bits=8 parity=N stop_bits=1 read_timeout=%.3fs",
+                baudrate,
+                read_timeout,
+            )
             self._serial = serial.Serial(
                 port,
                 baudrate,
@@ -31,6 +39,7 @@ class SerialTransport:
                 dsrdtr=False,
             )
         except (serial.SerialException, OSError, ValueError) as exc:
+            logger.debug("Serial open failed error=%s", type(exc).__name__)
             raise ConnectionError(f"Cannot open {port}: {exc}") from exc
 
     @property
@@ -42,11 +51,13 @@ class SerialTransport:
         import serial
 
         try:
+            logger.debug("Changing serial baud rate to %d", value)
             # BatteryView closes and reopens the port when changing its baud rate.
             self._serial.close()
             self._serial.baudrate = value
             self._serial.open()
         except (serial.SerialException, OSError, ValueError) as exc:
+            logger.debug("Baud change failed error=%s", type(exc).__name__)
             raise ConnectionError(f"Cannot change console baud rate: {exc}") from exc
 
     def read(self, size: int = 65536) -> bytes:
@@ -68,6 +79,7 @@ class SerialTransport:
             raise ConnectionError(f"Serial write failed: {exc}") from exc
 
     def close(self) -> None:
+        logger.debug("Closing serial port")
         self._serial.close()
 
 

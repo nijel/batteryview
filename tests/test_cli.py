@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -136,3 +137,58 @@ def test_invalid_cli_arguments(args):
     with pytest.raises(SystemExit) as exc:
         main(args)
     assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("flag", ["--debug", "--trace-serial"])
+@pytest.mark.parametrize("before", [True, False])
+def test_diagnostic_flags_before_or_after_command(flag, before, capsys):
+    args = [flag, "info", "--port", "COM3"] if before else ["info", "--port", "COM3", flag]
+    assert main(args) == 0
+    out, err = capsys.readouterr()
+    assert json.loads(out)["name"] == "SYNTHETIC_MODEL"
+    assert "Diagnostics enabled" in err
+    assert f"serial tracing={flag == '--trace-serial'}" in err
+
+
+@pytest.mark.parametrize("before", [True, False])
+def test_log_file_implies_debug_and_leaves_stderr_clean(tmp_path, before, capsys):
+    log_file = tmp_path / "debug.log"
+    flags = ["--log-file", str(log_file)]
+    args = flags + ["info", "--port", "COM3"] if before else ["info", "--port", "COM3"] + flags
+    assert main(args) == 0
+    out, err = capsys.readouterr()
+    assert json.loads(out)["name"] == "SYNTHETIC_MODEL"
+    assert not err
+    assert "Diagnostics enabled" in log_file.read_text(encoding="utf-8")
+
+
+def test_mixed_global_and_command_logging_options(tmp_path, capsys):
+    log_file = tmp_path / "debug.log"
+    assert main(["--trace-serial", "info", "--port", "COM3", "--log-file", str(log_file)]) == 0
+    assert "serial tracing=True" in log_file.read_text()
+    assert not capsys.readouterr().err
+
+
+def test_logging_file_is_not_overwritten(tmp_path, capsys):
+    log_file = tmp_path / "debug.log"
+    log_file.write_text("original")
+    assert main(["--log-file", str(log_file), "ports"]) == 1
+    assert log_file.read_text() == "original"
+    out, err = capsys.readouterr()
+    assert not out and "Cannot configure diagnostic logging" in err
+
+
+def test_failure_diagnostics_stay_on_stderr(capsys):
+    FakeClient.failure = BatteryViewError("disconnected")
+    assert main(["--debug", "snapshot", "--port", "COM3"]) == 1
+    out, err = capsys.readouterr()
+    assert not out
+    assert "Operation failed command=snapshot error=BatteryViewError" in err
+
+
+def test_default_cli_does_not_configure_root_logger(capsys):
+    root = logging.getLogger()
+    previous = root.level, root.handlers[:]
+    assert main(["info", "--port", "COM3"]) == 0
+    assert (root.level, root.handlers) == previous
+    assert not capsys.readouterr().err

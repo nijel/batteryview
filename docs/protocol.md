@@ -29,7 +29,12 @@ timing, mode switching, and reset execution require hardware validation.
 `ShifttoConsole` waits 500 ms after sending the frame, restores the selected
 console baud rate, waits another 500 ms, then sends an empty command to find a
 `pylon` prompt. The UI defaults to 115200 baud. Serial settings include 8 data
-bits and one stop bit. Initialization sends `login debug`, then `info`.
+bits and one stop bit. Vendor initialization sends `login debug`, then `info`.
+The Python client skips that login when synchronization already ends at
+`pylon_debug>`, since redundant login can be rejected. From the base prompt it
+sends login once and checks the last complete prompt, accepting a rejected
+login only if the final prompt confirms debug mode. The reset script's explicit
+post-reconnection login remains part of its saved transcript.
 
 Regular response patterns recognize `pylon>` and `$$` followed by a
 `pylon_debug>` prompt. History mode additionally recognizes:

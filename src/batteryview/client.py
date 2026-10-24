@@ -1,6 +1,7 @@
 """Monitoring and vendor report workflows, sharing one console session."""
 
 import json
+import logging
 import math
 import os
 import re
@@ -18,6 +19,7 @@ from .transcript import TranscriptWriter, report_filename
 from .transport import SerialTransport
 
 Progress = Callable[[str, int, int], None]
+logger = logging.getLogger(__name__)
 
 
 class BatteryClient:
@@ -67,6 +69,7 @@ class BatteryClient:
 
     def _select_module(self, session: ConsoleSession) -> None:
         if self.module is not None:
+            logger.debug("Selecting module=%d", self.module)
             session.exchange(f"login {self.module} debug")
 
     def close(self) -> None:
@@ -303,9 +306,11 @@ class BatteryClient:
 
     def snapshot(self) -> Snapshot:
         with self.session.lock:
+            logger.debug("Collecting snapshot selected_module=%s", self.module)
             raw: dict[str, str] = {}
             raw["pwr"] = self.session.exchange("pwr").text
             modules = parse_pwr(raw["pwr"])
+            logger.debug("Parsed pwr module_count=%d", len(modules))
             if self.module is not None:
                 modules = [m for m in modules if m.address == self.module]
                 if not modules:
@@ -317,6 +322,9 @@ class BatteryClient:
                 )
                 raw[command] = self.session.exchange(command).text
                 detail = parse_getpwr(raw[command], address=module.address)
+                logger.debug(
+                    "Parsed getpwr module=%s cell_count=%d", module.address, len(detail.cells)
+                )
                 # pwr supplies SOC and firmware extensions not present in getpwr.
                 states = {**module.states, **detail.states}
                 module = replace(
