@@ -62,6 +62,9 @@ class SerialTransport:
         import serial
 
         try:
+            if self._serial.is_open and self._serial.baudrate == value:
+                logger.debug("Serial baud rate already %d; keeping existing handle open", value)
+                return
             logger.debug("Changing serial baud rate to %d", value)
             # BatteryView closes and reopens the port when changing its baud rate.
             self._serial.close()

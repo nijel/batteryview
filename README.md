@@ -28,6 +28,8 @@ rate. Close other applications using the port before connecting.
 RTS and DTR are explicitly inactive, matching BatteryView's .NET serial defaults.
 Their states are set before the initial open and each baud-change reopen, and
 included in debug diagnostics.
+When the port is already open at the requested baud rate it stays open, so
+`--no-shift` avoids a redundant close/reopen and the associated input-buffer reset.
 
 Connection setup recognizes a console that is already at `pylon_debug>` and
 skips redundant login. Otherwise it sends `login debug` once and verifies the

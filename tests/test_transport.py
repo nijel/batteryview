@@ -33,13 +33,16 @@ def test_serial_settings_baud_reopen_and_io(monkeypatch):
             self.port = port
             self.dtr = True
             self.rts = True
+            self.is_open = False
 
         def close(self):
+            self.is_open = False
             self.operations.append("close")
 
         def open(self):
             assert self.port == "COM3"
             assert self.dtr is False and self.rts is False
+            self.is_open = True
             self.operations.append("open")
 
         def read(self, size):
@@ -55,6 +58,8 @@ def test_serial_settings_baud_reopen_and_io(monkeypatch):
 
     monkeypatch.setattr(serial, "Serial", FakeSerial)
     transport = SerialTransport("COM3")
+    transport.baudrate = 115200
+    assert transport._serial.operations == ["open"]
     # Each reopen must explicitly restore the inactive line states.
     transport._serial.dtr = True
     transport._serial.rts = True
@@ -63,6 +68,41 @@ def test_serial_settings_baud_reopen_and_io(monkeypatch):
     assert transport.read() == b"data"
     assert transport.write(b"info\n") == 5
     assert transport._serial.operations == ["open", "close", "open", b"info\n", "flush"]
+
+
+def test_unchanged_baud_keeps_pending_input_and_closed_port_can_reopen(monkeypatch):
+    class FakeSerial:
+        def __init__(self, port, baudrate, **kwargs):
+            self.baudrate = baudrate
+            self.is_open = False
+            self.pending = b""
+            self.opens = 0
+
+        def open(self):
+            self.is_open = True
+            self.opens += 1
+            self.pending = b""  # pySerial discards buffered input when opening.
+
+        def close(self):
+            self.is_open = False
+
+        @property
+        def in_waiting(self):
+            return len(self.pending)
+
+        def read(self, size):
+            data, self.pending = self.pending[:size], self.pending[size:]
+            return data
+
+    monkeypatch.setattr(serial, "Serial", FakeSerial)
+    transport = SerialTransport("COM3")
+    transport._serial.pending = b"SYNTHETIC_RESPONSE"
+    transport.baudrate = 115200
+    assert transport._serial.opens == 1
+    assert transport.read() == b"SYNTHETIC_RESPONSE"
+    transport.close()
+    transport.baudrate = 115200
+    assert transport._serial.is_open and transport._serial.opens == 2
 
 
 def test_unavailable_port_is_a_connection_error(monkeypatch):
