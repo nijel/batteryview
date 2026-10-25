@@ -56,7 +56,7 @@ Reproducing the data-derived findings
 -------------------------------------
 
 The stdlib-only `detail
-extractor <https://github.com/nijel/batteryview/blob/main/scripts/extract_firmware_details.py>`__
+extractor <https://github.com/nijel/pylontech-tools/blob/main/scripts/extract_firmware_details.py>`__
 checks the same reviewed hashes as the command extractor, reconstructs bounded initialized-data
 streams and emits the :download:`detail metadata </firmware-details.json>`: weekday labels, all
 38 C gauge descriptors, initialized-data fingerprints and programming-script

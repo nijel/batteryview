@@ -10,9 +10,11 @@ version = release
 extensions = ["sphinx.ext.autodoc", "sphinxarg.ext", "sphinx_copybutton"]
 autodoc_typehints = "none"
 html_theme = "furo"
-html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "")
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL", "https://pylontech-tools.readthedocs.io/en/latest/"
+)
 html_theme_options = {
-    "source_repository": "https://github.com/nijel/batteryview/",
+    "source_repository": "https://github.com/nijel/pylontech-tools/",
     "source_branch": "main",
     "source_directory": "docs/",
 }

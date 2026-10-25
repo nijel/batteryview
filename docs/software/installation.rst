@@ -15,10 +15,13 @@ Pylontech have not yet been verified.** Other firmware variants need additional 
 Install
 -------
 
-Requires Python 3.11 or newer on Windows, Linux, or macOS:
+Requires Python 3.11 or newer on Windows, Linux, or macOS. Clone the
+`source repository <https://github.com/nijel/pylontech-tools>`__ before installing:
 
 .. code:: sh
 
+   git clone https://github.com/nijel/pylontech-tools.git
+   cd pylontech-tools
    python -m pip install .
    pylontech-console ports
 

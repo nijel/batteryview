@@ -40,7 +40,7 @@ The :doc:`parameter reference </protocol/index>` adds accepted forms, numeric ba
 defaults, storage effects and known firmware validation bugs. The
 :doc:`handler supplement </protocol/index>` traces record queries, persistence, calibration and
 test side effects; its `detail
-extractor <https://github.com/nijel/batteryview/blob/main/scripts/extract_firmware_details.py>`__
+extractor <https://github.com/nijel/pylontech-tools/blob/main/scripts/extract_firmware_details.py>`__
 reproduces decoded metadata without including firmware payloads or original logs.
 
 GUI, TCP adapters, XLSX exports, parameter editing, firmware updating, and arbitrary service

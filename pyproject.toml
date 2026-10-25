@@ -11,6 +11,11 @@ requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 dependencies = ["pyserial>=3.5,<4"]
 
+[project.urls]
+Documentation = "https://pylontech-tools.readthedocs.io/en/latest/"
+Source = "https://github.com/nijel/pylontech-tools"
+Issues = "https://github.com/nijel/pylontech-tools/issues"
+
 [project.scripts]
 pylontech-console = "pylontech_tools.cli:main"
 
