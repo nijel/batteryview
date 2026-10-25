@@ -1,0 +1,2060 @@
+{
+  "schema_version": 1,
+  "image_base": "0x08003800",
+  "command_record_size": 28,
+  "images": [
+    {
+      "name": "US_C_V3.1_Crc.bin",
+      "sha256": "5450e3bd884ae63549fc3b278ecccc0126227234f7148c7961542755cbad2d7d",
+      "size": 242688,
+      "board_tag": "US2000C",
+      "tables": {
+        "remote": {
+          "file_offset": "0x37444",
+          "address": "0x0803ac44",
+          "count": 12
+        },
+        "local": {
+          "file_offset": "0x375b0",
+          "address": "0x0803adb0",
+          "count": 90
+        }
+      },
+      "commands": [
+        {
+          "scope": "remote",
+          "name": "config",
+          "max_tokens": 9,
+          "required_mask": "0x03",
+          "handler_address": "0x0800c644",
+          "record_offset": "0x37444",
+          "help": "config [pov/povr/phv/phvr/plv/plvr/puv/puvr/pslp/bov/bovr/bhv/bhvr/blv/blvr/buv/buvr/bslp/bsv/bv\r\n /bot/botr/bht/bhtr/blt/bltr/but/butr/coc/coca/cocar\r\n /eot/eotr/eht/ehtr/elt/eltr/eut/eutr/doc/doca/docar/ocd/ocr/oc2d/oc2r/sc/scd/scr/clc\r\n /recinv/shuttime/uvtime/save/default/recuse/idle][val]\r\n /[sleep/record][on/off/day/week/month][starttime][endtime]\r\n /[hwsleep][<on/off>][sleeptime][wakeuptime]"
+        },
+        {
+          "scope": "remote",
+          "name": "ctrl",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x0802cc7c",
+          "record_offset": "0x37460",
+          "help": "Contrl IO - ctrl [cfet/dfet/buzz/heat/afuse] [on/off]"
+        },
+        {
+          "scope": "remote",
+          "name": "data",
+          "max_tokens": 3,
+          "required_mask": "0x01",
+          "handler_address": "0x080092ac",
+          "record_offset": "0x3747c",
+          "help": "History data load - data [event/history/pov/puv/plv/bov/buv/inputov/coc/coca/doc/doca/sc/use][item]"
+        },
+        {
+          "scope": "remote",
+          "name": "emptyvolt",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802d7d0",
+          "record_offset": "0x37498",
+          "help": "Set empty volt - emptyvolt [val]"
+        },
+        {
+          "scope": "remote",
+          "name": "info",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x0802c734",
+          "record_offset": "0x374b4",
+          "help": "Device infomation - info"
+        },
+        {
+          "scope": "remote",
+          "name": "login",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x08026f0e",
+          "record_offset": "0x374d0",
+          "help": "Login Admin mode - login [password]"
+        },
+        {
+          "scope": "remote",
+          "name": "logout",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08026f98",
+          "record_offset": "0x374ec",
+          "help": "user mode  - logout"
+        },
+        {
+          "scope": "remote",
+          "name": "prot",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x0800e92c",
+          "record_offset": "0x37508",
+          "help": "Protect ctrl - prot [bov/bhv/blv/buv/pov/phv/plv/puv/cbot/cbht/cblt/cbut/dbot/dbht/dblt/dbut/pot/pht/plt/put/coc/coc2/coca/doc/doc2/doca/sc/buzz/smartchg/default][en/dis]"
+        },
+        {
+          "scope": "remote",
+          "name": "couls",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800f21c",
+          "record_offset": "0x37524",
+          "help": "Coulomb calc type - couls [iah/vah/asic/default]"
+        },
+        {
+          "scope": "remote",
+          "name": "soh",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x0800c4ec",
+          "record_offset": "0x37540",
+          "help": "State of health - soh [addr]"
+        },
+        {
+          "scope": "remote",
+          "name": "stat",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08008a14",
+          "record_offset": "0x3755c",
+          "help": "Statistic data show - stat"
+        },
+        {
+          "scope": "remote",
+          "name": "statc",
+          "max_tokens": 1,
+          "required_mask": "0x03",
+          "handler_address": "0x08008ff0",
+          "record_offset": "0x37578",
+          "help": "Clear statistic - statc"
+        },
+        {
+          "scope": "local",
+          "name": "bat",
+          "max_tokens": 3,
+          "required_mask": "0x01",
+          "handler_address": "0x080075c0",
+          "record_offset": "0x375b0",
+          "help": "Battery data show - bat [pwr][index]"
+        },
+        {
+          "scope": "local",
+          "name": "ci",
+          "max_tokens": 1,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801dcdc",
+          "record_offset": "0x375cc",
+          "help": "Current Comm Info"
+        },
+        {
+          "scope": "local",
+          "name": "config",
+          "max_tokens": 9,
+          "required_mask": "0x03",
+          "handler_address": "0x0800c644",
+          "record_offset": "0x375e8",
+          "help": "config [pov/povr/phv/phvr/plv/plvr/puv/puvr/pslp/bov/bovr/bhv/bhvr/blv/blvr/buv/buvr/bslp/bsv/bv\r\n /bot/botr/bht/bhtr/blt/bltr/but/butr/coc/coca/cocar\r\n /eot/eotr/eht/ehtr/elt/eltr/eut/eutr/doc/doca/docar/ocd/ocr/oc2d/oc2r/sc/scd/scr/clc\r\n /recinv/shuttime/uvtime/save/default/recuse/idle][val]\r\n /[sleep/record][on/off/day/week/month][starttime][endtime]\r\n /[hwsleep][<on/off>][sleeptime][wakeuptime]"
+        },
+        {
+          "scope": "local",
+          "name": "tcycle",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800f2ec",
+          "record_offset": "0x37604",
+          "help": "test cycle times - tcycle [cycle times]"
+        },
+        {
+          "scope": "local",
+          "name": "ct",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801dbbc",
+          "record_offset": "0x37620",
+          "help": "Track Comm Port Data [Port Number]"
+        },
+        {
+          "scope": "local",
+          "name": "ctrl",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x0802cc7c",
+          "record_offset": "0x3763c",
+          "help": "Contrl IO - ctrl [cfet/dfet/buzz/heat/afuse] [on/off]"
+        },
+        {
+          "scope": "local",
+          "name": "bmicrdcomm",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x080161f8",
+          "record_offset": "0x37658",
+          "help": "BMIC read comm - bmicrdcomm [total_ic]"
+        },
+        {
+          "scope": "local",
+          "name": "bmicrdcfg",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x080161b0",
+          "record_offset": "0x37674",
+          "help": "BMIC read cfg - bmicrdcfg [total_ic]"
+        },
+        {
+          "scope": "local",
+          "name": "data",
+          "max_tokens": 3,
+          "required_mask": "0x01",
+          "handler_address": "0x080092ac",
+          "record_offset": "0x37690",
+          "help": "History data load - data [event/history/pov/puv/plv/bov/buv/inputov/coc/coca/doc/doca/sc/use][item]"
+        },
+        {
+          "scope": "local",
+          "name": "datac",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802d35c",
+          "record_offset": "0x376ac",
+          "help": "Clear data - datac [event/history/event_log/use]"
+        },
+        {
+          "scope": "local",
+          "name": "datalist",
+          "max_tokens": 6,
+          "required_mask": "0x01",
+          "handler_address": "0x0800b048",
+          "record_offset": "0x376c8",
+          "help": "Show recorded data - datalist [event/history/pov/puv/plv/bov/buv/inputov/coc/coca/doc/doca/sc/use][item/bat][batnun][volt/curr/temp/coul][item]"
+        },
+        {
+          "scope": "local",
+          "name": "disp",
+          "max_tokens": 5,
+          "required_mask": "0x01",
+          "handler_address": "0x08009fb4",
+          "record_offset": "0x376e4",
+          "help": "Display Info at regular intervals - disp [(pwrs pwrNo)/val]/[(bats batNo)/volt/curr/temp]"
+        },
+        {
+          "scope": "local",
+          "name": "eepe",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x080103dc",
+          "record_offset": "0x37700",
+          "help": "EEPROM erase - eepe [chip]"
+        },
+        {
+          "scope": "local",
+          "name": "eepr",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801017c",
+          "record_offset": "0x3771c",
+          "help": "EEPROM read - eepr [chip][Offset][size]"
+        },
+        {
+          "scope": "local",
+          "name": "eepw",
+          "max_tokens": 5,
+          "required_mask": "0x0f",
+          "handler_address": "0x080102d4",
+          "record_offset": "0x37738",
+          "help": "EEPROM write - eepw [chip][Offset][Val][size]"
+        },
+        {
+          "scope": "local",
+          "name": "flae",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801f93c",
+          "record_offset": "0x37754",
+          "help": "Extend flash erase - flae [chip]"
+        },
+        {
+          "scope": "local",
+          "name": "flar",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801f822",
+          "record_offset": "0x37770",
+          "help": "Extend flash read - flar [chip][Offset][size]"
+        },
+        {
+          "scope": "local",
+          "name": "flaw",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801f8a8",
+          "record_offset": "0x3778c",
+          "help": "Extend flash write - flaw [chip][Offset][Val]"
+        },
+        {
+          "scope": "local",
+          "name": "getpwr",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x0800ef44",
+          "record_offset": "0x377a8",
+          "help": "Get power Info - getpwr"
+        },
+        {
+          "scope": "local",
+          "name": "help",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x0802670e",
+          "record_offset": "0x377c4",
+          "help": "Help [cmd]"
+        },
+        {
+          "scope": "local",
+          "name": "info",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x0802c734",
+          "record_offset": "0x377e0",
+          "help": "Device infomation - info"
+        },
+        {
+          "scope": "local",
+          "name": "log",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x0801743c",
+          "record_offset": "0x377fc",
+          "help": "Log information show - log"
+        },
+        {
+          "scope": "local",
+          "name": "login",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x08026f0e",
+          "record_offset": "0x37818",
+          "help": "Login Admin mode - login [password]"
+        },
+        {
+          "scope": "local",
+          "name": "logc",
+          "max_tokens": 1,
+          "required_mask": "0x03",
+          "handler_address": "0x08017618",
+          "record_offset": "0x37834",
+          "help": "Log clear - logc"
+        },
+        {
+          "scope": "local",
+          "name": "logout",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08026f98",
+          "record_offset": "0x37850",
+          "help": "user mode  - logout"
+        },
+        {
+          "scope": "local",
+          "name": "logt",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801764c",
+          "record_offset": "0x3786c",
+          "help": "Log test - logt [data]"
+        },
+        {
+          "scope": "local",
+          "name": "lg",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x0802c16e",
+          "record_offset": "0x37888",
+          "help": "LG State - lg [cstm/sys][en/dis]"
+        },
+        {
+          "scope": "local",
+          "name": "md",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x08026d4a",
+          "record_offset": "0x378a4",
+          "help": "Memory dump - md [width][Addr][size]"
+        },
+        {
+          "scope": "local",
+          "name": "mm",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x08026e84",
+          "record_offset": "0x378c0",
+          "help": "Memory set - mm [width][Addr][Val]"
+        },
+        {
+          "scope": "local",
+          "name": "prot",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x0800e92c",
+          "record_offset": "0x378dc",
+          "help": "Protect ctrl - prot [bov/bhv/blv/buv/pov/phv/plv/puv/cbot/cbht/cblt/cbut/dbot/dbht/dblt/dbut/pot/pht/plt/put/coc/coc2/coca/doc/doc2/doca/sc/buzz/smartchg/default][en/dis]"
+        },
+        {
+          "scope": "local",
+          "name": "pwr",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x08007a34",
+          "record_offset": "0x378f8",
+          "help": "Power data show - pwr [index]"
+        },
+        {
+          "scope": "local",
+          "name": "save",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x08009028",
+          "record_offset": "0x37914",
+          "help": "Save data - save [event/history]"
+        },
+        {
+          "scope": "local",
+          "name": "setprt",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802dc40",
+          "record_offset": "0x37930",
+          "help": "set protocol type - setprt [sma/lg]"
+        },
+        {
+          "scope": "local",
+          "name": "setlowcfg",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800fcb8",
+          "record_offset": "0x3794c",
+          "help": "set Low config- setlowcfg [save] / [shutsoc/sstime] [num]"
+        },
+        {
+          "scope": "local",
+          "name": "socr",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x080207f2",
+          "record_offset": "0x37968",
+          "help": "SOC read - socr[Offset]"
+        },
+        {
+          "scope": "local",
+          "name": "socw",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x0802084c",
+          "record_offset": "0x37984",
+          "help": "SOC write - socw [Offset][Val]"
+        },
+        {
+          "scope": "local",
+          "name": "socsh",
+          "max_tokens": 1,
+          "required_mask": "0x0f",
+          "handler_address": "0x080210b8",
+          "record_offset": "0x379a0",
+          "help": "SOC show reg -socsh"
+        },
+        {
+          "scope": "local",
+          "name": "soccfg",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x080208d4",
+          "record_offset": "0x379bc",
+          "help": "SOC config - soccfg[subclass][Offset][value]"
+        },
+        {
+          "scope": "local",
+          "name": "soccal",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x080212d8",
+          "record_offset": "0x379d8",
+          "help": "SOC calibration - soccal [volt/current/tempr/ccoffset/bdoffsetP1/bdoffsetP2] [value]"
+        },
+        {
+          "scope": "local",
+          "name": "socd",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x08021164",
+          "record_offset": "0x379f4",
+          "help": "SOC show data - socd"
+        },
+        {
+          "scope": "local",
+          "name": "tsoc",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x08021e0c",
+          "record_offset": "0x37a10",
+          "help": "bq34z100 test - tsoc"
+        },
+        {
+          "scope": "local",
+          "name": "socclr",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802dc28",
+          "record_offset": "0x37a2c",
+          "help": "clear bq34z100 data flash  and reload default value - socclr"
+        },
+        {
+          "scope": "local",
+          "name": "soct",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x08021cac",
+          "record_offset": "0x37a48",
+          "help": "SOC show Ra table - soct"
+        },
+        {
+          "scope": "local",
+          "name": "setsoc",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0800fc3c",
+          "record_offset": "0x37a64",
+          "help": "Set SOC - setsoc [val]"
+        },
+        {
+          "scope": "local",
+          "name": "autoswitch",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800fd54",
+          "record_offset": "0x37a80",
+          "help": "ctrl auto-switching enable/disable - autoswitch [1/0]"
+        },
+        {
+          "scope": "local",
+          "name": "shut",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x0800c454",
+          "record_offset": "0x37a9c",
+          "help": "Shut down - shut"
+        },
+        {
+          "scope": "local",
+          "name": "soh",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x0800c4ec",
+          "record_offset": "0x37ab8",
+          "help": "State of health - soh [addr]"
+        },
+        {
+          "scope": "local",
+          "name": "stat",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08008a14",
+          "record_offset": "0x37ad4",
+          "help": "Statistic data show - stat"
+        },
+        {
+          "scope": "local",
+          "name": "statc",
+          "max_tokens": 1,
+          "required_mask": "0x03",
+          "handler_address": "0x08008ff0",
+          "record_offset": "0x37af0",
+          "help": "Clear statistic - statc"
+        },
+        {
+          "scope": "local",
+          "name": "tsoftdsg",
+          "max_tokens": 1,
+          "required_mask": "0x0f",
+          "handler_address": "0x0802ee64",
+          "record_offset": "0x37b0c",
+          "help": "Test Soft DSG - tsoftdsg"
+        },
+        {
+          "scope": "local",
+          "name": "tbar",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802e82c",
+          "record_offset": "0x37b28",
+          "help": "Test write Barcode - tbar[reg]"
+        },
+        {
+          "scope": "local",
+          "name": "tbuz",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802e798",
+          "record_offset": "0x37b44",
+          "help": "Test Buzzer - tbuz"
+        },
+        {
+          "scope": "local",
+          "name": "tchgc",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f700",
+          "record_offset": "0x37b60",
+          "help": "test Charge current - tchgc"
+        },
+        {
+          "scope": "local",
+          "name": "tclear",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f9c4",
+          "record_offset": "0x37b7c",
+          "help": "test clear record on chip- tclear"
+        },
+        {
+          "scope": "local",
+          "name": "tibcio",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802ea3c",
+          "record_offset": "0x37b98",
+          "help": "Test ibc io - tibcio [nc/sc]"
+        },
+        {
+          "scope": "local",
+          "name": "tcan",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802dd6c",
+          "record_offset": "0x37bb4",
+          "help": "Test can port - tcan [port#]"
+        },
+        {
+          "scope": "local",
+          "name": "tcbnio",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802eb60",
+          "record_offset": "0x37bd0",
+          "help": "Test cbn io - tcbnio [nc/sc]"
+        },
+        {
+          "scope": "local",
+          "name": "tdip",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802e700",
+          "record_offset": "0x37bec",
+          "help": "Test Dip - tdip [flag]"
+        },
+        {
+          "scope": "local",
+          "name": "tdisc",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f7c4",
+          "record_offset": "0x37c08",
+          "help": "test discharge current - tdisc"
+        },
+        {
+          "scope": "local",
+          "name": "teepr",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x08010426",
+          "record_offset": "0x37c24",
+          "help": "Device EEPROM test - teepr"
+        },
+        {
+          "scope": "local",
+          "name": "tetmp",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f614",
+          "record_offset": "0x37c40",
+          "help": "test enviroment temperature - tetmp"
+        },
+        {
+          "scope": "local",
+          "name": "tflash",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802eccc",
+          "record_offset": "0x37c5c",
+          "help": "Device Flash test - tflash"
+        },
+        {
+          "scope": "local",
+          "name": "ti2c",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802e014",
+          "record_offset": "0x37c78",
+          "help": "I2C test - ti2c"
+        },
+        {
+          "scope": "local",
+          "name": "time",
+          "max_tokens": 7,
+          "required_mask": "0x01",
+          "handler_address": "0x0802c2f4",
+          "record_offset": "0x37c94",
+          "help": "Time - time [year] [month] [day] [hour] [minute] [second]"
+        },
+        {
+          "scope": "local",
+          "name": "cmudtesttime",
+          "max_tokens": 7,
+          "required_mask": "0x01",
+          "handler_address": "0x0802c4c0",
+          "record_offset": "0x37cb0",
+          "help": "Device Test Time - cmudtesttime [year] [month] [day] [hour] [minute] [second]"
+        },
+        {
+          "scope": "local",
+          "name": "tinput",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802e920",
+          "record_offset": "0x37ccc",
+          "help": "test input state - tinput [rv/dcov/absent/present]"
+        },
+        {
+          "scope": "local",
+          "name": "tled",
+          "max_tokens": 3,
+          "required_mask": "0x05",
+          "handler_address": "0x0802e1dc",
+          "record_offset": "0x37ce8",
+          "help": "Test Led - tled [0/lednum/on/off] [on/off]"
+        },
+        {
+          "scope": "local",
+          "name": "tmos",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f878",
+          "record_offset": "0x37d04",
+          "help": "test mosfet - tmos [cfet/dfet]"
+        },
+        {
+          "scope": "local",
+          "name": "tmprctrl",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800eddc",
+          "record_offset": "0x37d20",
+          "help": "Bat tmpr ctrl - tmprctrl [flag]/[flag][batid][val]"
+        },
+        {
+          "scope": "local",
+          "name": "trst",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x0802e7d0",
+          "record_offset": "0x37d3c",
+          "help": "Test Soft Reset - trst"
+        },
+        {
+          "scope": "local",
+          "name": "tpwr",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0800fac8",
+          "record_offset": "0x37d58",
+          "help": "test the total voltage of the power - tpwr"
+        },
+        {
+          "scope": "local",
+          "name": "tsto",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0800fb28",
+          "record_offset": "0x37d74",
+          "help": "test selftest output - tsto"
+        },
+        {
+          "scope": "local",
+          "name": "tver",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800fbdc",
+          "record_offset": "0x37d90",
+          "help": "test soft version - tver[version]"
+        },
+        {
+          "scope": "local",
+          "name": "tsoh",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0800fa86",
+          "record_offset": "0x37dac",
+          "help": "test soh - tsoh"
+        },
+        {
+          "scope": "local",
+          "name": "tusart",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802ded4",
+          "record_offset": "0x37dc8",
+          "help": "Usart test - tusart"
+        },
+        {
+          "scope": "local",
+          "name": "ttmp",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f508",
+          "record_offset": "0x37de4",
+          "help": "test battery temperature - ttmp"
+        },
+        {
+          "scope": "local",
+          "name": "tdct",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802cb38",
+          "record_offset": "0x37e00",
+          "help": "Test dry ct - tdct"
+        },
+        {
+          "scope": "local",
+          "name": "euro",
+          "max_tokens": 4,
+          "required_mask": "0x01",
+          "handler_address": "0x08018f78",
+          "record_offset": "0x37e1c",
+          "help": "dsplay Euro stat list - euro"
+        },
+        {
+          "scope": "local",
+          "name": "eurostub",
+          "max_tokens": 4,
+          "required_mask": "0x01",
+          "handler_address": "0x0801917c",
+          "record_offset": "0x37e38",
+          "help": "stub Euro stat list - eurostub"
+        },
+        {
+          "scope": "local",
+          "name": "tbld",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802ec40",
+          "record_offset": "0x37e54",
+          "help": "Test bleeding - tbld [val]"
+        },
+        {
+          "scope": "local",
+          "name": "updata",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x0802c674",
+          "record_offset": "0x37e70",
+          "help": "updata system - updata"
+        },
+        {
+          "scope": "local",
+          "name": "tvolt",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f3d8",
+          "record_offset": "0x37e8c",
+          "help": "test battery voltage - tvolt"
+        },
+        {
+          "scope": "local",
+          "name": "twdg",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802e6d4",
+          "record_offset": "0x37ea8",
+          "help": "Stop feeding watchdog - wdg"
+        },
+        {
+          "scope": "local",
+          "name": "emptyvolt",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802d7d0",
+          "record_offset": "0x37ec4",
+          "help": "Set empty volt - emptyvolt [val]"
+        },
+        {
+          "scope": "local",
+          "name": "blocksoc",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802d894",
+          "record_offset": "0x37ee0",
+          "help": "set block soc - blocksoc [val]"
+        },
+        {
+          "scope": "local",
+          "name": "totalcoul",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802d570",
+          "record_offset": "0x37efc",
+          "help": "Set total coul - totalcoul [val]"
+        },
+        {
+          "scope": "local",
+          "name": "pwrsys",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0801449c",
+          "record_offset": "0x37f18",
+          "help": "power system info display"
+        },
+        {
+          "scope": "local",
+          "name": "urates",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802d974",
+          "record_offset": "0x37f34",
+          "help": "Set R485 Port Rate - urates [500000/115200/9600]"
+        },
+        {
+          "scope": "local",
+          "name": "tagevolt",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802da18",
+          "record_offset": "0x37f50",
+          "help": "test age volt"
+        },
+        {
+          "scope": "local",
+          "name": "trdagevolt",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802da80",
+          "record_offset": "0x37f6c",
+          "help": "read age volt"
+        }
+      ],
+      "selector_tables": {
+        "config": {
+          "address": "0x08039884",
+          "selectors": [
+            "pov",
+            "povr",
+            "phv",
+            "phvr",
+            "plv",
+            "plvr",
+            "puv",
+            "puvr",
+            "pslp",
+            "bov",
+            "bovr",
+            "bhv",
+            "bhvr",
+            "blv",
+            "blvr",
+            "buv",
+            "buvr",
+            "bslp",
+            "bot",
+            "botr",
+            "bht",
+            "bhtr",
+            "blt",
+            "bltr",
+            "but",
+            "butr",
+            "coc",
+            "coca",
+            "cocar",
+            "doc",
+            "doca",
+            "docar",
+            "ocd",
+            "ocr",
+            "sc",
+            "scd",
+            "scr",
+            "clc",
+            "sleep",
+            "hwsleep",
+            "record",
+            "recinv",
+            "shuttime",
+            "uvtime",
+            "oc2d",
+            "oc2r",
+            "bsv",
+            "bv",
+            "save",
+            "default",
+            "eot",
+            "eotr",
+            "eht",
+            "ehtr",
+            "elt",
+            "eltr",
+            "eut",
+            "eutr",
+            "softtime",
+            "mot",
+            "motr",
+            "cocp",
+            "docp",
+            "ocpd",
+            "recuse",
+            "idle"
+          ]
+        },
+        "prot": {
+          "address": "0x08039990",
+          "selectors": [
+            "default",
+            "bov",
+            "bhv",
+            "blv",
+            "buv",
+            "bslp",
+            "cbot",
+            "cbht",
+            "cblt",
+            "cbut",
+            "dbot",
+            "dbht",
+            "dblt",
+            "dbut",
+            "pov",
+            "phv",
+            "plv",
+            "puv",
+            "pslp",
+            "pot",
+            "pht",
+            "plt",
+            "put",
+            "sc",
+            "doc2",
+            "doc",
+            "doca",
+            "coca",
+            "coc",
+            "coc2",
+            "buzz",
+            "smartchg",
+            "lcoul",
+            "mot"
+          ]
+        },
+        "ctrl": {
+          "address": "0x0802d248",
+          "selectors": [
+            "cfet",
+            "dfet",
+            "buzz",
+            "heat",
+            "pwmc",
+            "pwmp",
+            "softstart",
+            "i2c",
+            "afuse",
+            "agelog",
+            "mostest"
+          ]
+        },
+        "datalist": {
+          "address": "0x0803986c",
+          "selectors": [
+            "id",
+            "volt",
+            "curr",
+            "temp",
+            "coul"
+          ]
+        }
+      }
+    },
+    {
+      "name": "US_E2_V2.5_Crc.bin",
+      "sha256": "897c3326ab8905df75a7297905112958a07c0a2cbb0592e0ecc274b886b0c82e",
+      "size": 217088,
+      "board_tag": "US2000C_NF4",
+      "tables": {
+        "remote": {
+          "file_offset": "0x32bb0",
+          "address": "0x080363b0",
+          "count": 12
+        },
+        "local": {
+          "file_offset": "0x32d1c",
+          "address": "0x0803651c",
+          "count": 79
+        }
+      },
+      "commands": [
+        {
+          "scope": "remote",
+          "name": "config",
+          "max_tokens": 9,
+          "required_mask": "0x03",
+          "handler_address": "0x0800c684",
+          "record_offset": "0x32bb0",
+          "help": "config [pov/povr/phv/phvr/plv/plvr/puv/puvr/pslp/bov/bovr/bhv/bhvr/blv/blvr/buv/buvr/bslp/bsv/bv\r\n /bot/botr/bht/bhtr/blt/bltr/but/butr/coc/coca/cocar\r\n /eot/eotr/eht/ehtr/elt/eltr/eut/eutr/doc/doca/docar/ocd/ocr/oc2d/oc2r/sc/scd/scr/clc\r\n /recinv/shuttime/uvtime/save/default/recuse/idle][val]\r\n /[sleep/record][on/off/day/week/month][starttime][endtime]\r\n /[hwsleep][<on/off>][sleeptime][wakeuptime]"
+        },
+        {
+          "scope": "remote",
+          "name": "ctrl",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x08029500",
+          "record_offset": "0x32bcc",
+          "help": "Contrl IO - ctrl [cfet/dfet/buzz/heat/afuse] [on/off]"
+        },
+        {
+          "scope": "remote",
+          "name": "data",
+          "max_tokens": 3,
+          "required_mask": "0x01",
+          "handler_address": "0x080092f8",
+          "record_offset": "0x32be8",
+          "help": "History data load - data [event/history/pov/puv/plv/bov/buv/inputov/coc/coca/doc/doca/sc/use][item]"
+        },
+        {
+          "scope": "remote",
+          "name": "emptyvolt",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802a174",
+          "record_offset": "0x32c04",
+          "help": "Set empty volt - emptyvolt [val]"
+        },
+        {
+          "scope": "remote",
+          "name": "info",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08028de4",
+          "record_offset": "0x32c20",
+          "help": "Device infomation - info"
+        },
+        {
+          "scope": "remote",
+          "name": "login",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x08025578",
+          "record_offset": "0x32c3c",
+          "help": "Login Admin mode - login [password]"
+        },
+        {
+          "scope": "remote",
+          "name": "logout",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08025604",
+          "record_offset": "0x32c58",
+          "help": "user mode  - logout"
+        },
+        {
+          "scope": "remote",
+          "name": "prot",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x0800e96c",
+          "record_offset": "0x32c74",
+          "help": "Protect ctrl - prot [bov/bhv/blv/buv/pov/phv/plv/puv/cbot/cbht/cblt/cbut/dbot/dbht/dblt/dbut/pot/pht/plt/put/coc/coc2/coca/doc/doc2/doca/sc/buzz/smartchg/default][en/dis]"
+        },
+        {
+          "scope": "remote",
+          "name": "couls",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800f25c",
+          "record_offset": "0x32c90",
+          "help": "Coulomb calc type - couls [iah/vah/asic/default]"
+        },
+        {
+          "scope": "remote",
+          "name": "soh",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x0800c528",
+          "record_offset": "0x32cac",
+          "help": "State of health - soh [addr]"
+        },
+        {
+          "scope": "remote",
+          "name": "stat",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08008a60",
+          "record_offset": "0x32cc8",
+          "help": "Statistic data show - stat"
+        },
+        {
+          "scope": "remote",
+          "name": "statc",
+          "max_tokens": 1,
+          "required_mask": "0x03",
+          "handler_address": "0x08009036",
+          "record_offset": "0x32ce4",
+          "help": "Clear statistic - statc"
+        },
+        {
+          "scope": "local",
+          "name": "bat",
+          "max_tokens": 3,
+          "required_mask": "0x01",
+          "handler_address": "0x080075a8",
+          "record_offset": "0x32d1c",
+          "help": "Battery data show - bat [pwr][index]"
+        },
+        {
+          "scope": "local",
+          "name": "ci",
+          "max_tokens": 1,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801e218",
+          "record_offset": "0x32d38",
+          "help": "Current Comm Info"
+        },
+        {
+          "scope": "local",
+          "name": "config",
+          "max_tokens": 9,
+          "required_mask": "0x03",
+          "handler_address": "0x0800c684",
+          "record_offset": "0x32d54",
+          "help": "config [pov/povr/phv/phvr/plv/plvr/puv/puvr/pslp/bov/bovr/bhv/bhvr/blv/blvr/buv/buvr/bslp/bsv/bv\r\n /bot/botr/bht/bhtr/blt/bltr/but/butr/coc/coca/cocar\r\n /eot/eotr/eht/ehtr/elt/eltr/eut/eutr/doc/doca/docar/ocd/ocr/oc2d/oc2r/sc/scd/scr/clc\r\n /recinv/shuttime/uvtime/save/default/recuse/idle][val]\r\n /[sleep/record][on/off/day/week/month][starttime][endtime]\r\n /[hwsleep][<on/off>][sleeptime][wakeuptime]"
+        },
+        {
+          "scope": "local",
+          "name": "tcycle",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800f32c",
+          "record_offset": "0x32d70",
+          "help": "test cycle times - tcycle [cycle times]"
+        },
+        {
+          "scope": "local",
+          "name": "ct",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801e0f8",
+          "record_offset": "0x32d8c",
+          "help": "Track Comm Port Data [Port Number]"
+        },
+        {
+          "scope": "local",
+          "name": "ctrl",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x08029500",
+          "record_offset": "0x32da8",
+          "help": "Contrl IO - ctrl [cfet/dfet/buzz/heat/afuse] [on/off]"
+        },
+        {
+          "scope": "local",
+          "name": "bmicrdcomm",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x08016498",
+          "record_offset": "0x32dc4",
+          "help": "BMIC read comm - bmicrdcomm [total_ic]"
+        },
+        {
+          "scope": "local",
+          "name": "bmicrdcfg",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x08016450",
+          "record_offset": "0x32de0",
+          "help": "BMIC read cfg - bmicrdcfg [total_ic]"
+        },
+        {
+          "scope": "local",
+          "name": "data",
+          "max_tokens": 3,
+          "required_mask": "0x01",
+          "handler_address": "0x080092f8",
+          "record_offset": "0x32dfc",
+          "help": "History data load - data [event/history/pov/puv/plv/bov/buv/inputov/coc/coca/doc/doca/sc/use][item]"
+        },
+        {
+          "scope": "local",
+          "name": "datac",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x08029d08",
+          "record_offset": "0x32e18",
+          "help": "Clear data - datac [event/history/event_log/use]"
+        },
+        {
+          "scope": "local",
+          "name": "datalist",
+          "max_tokens": 6,
+          "required_mask": "0x01",
+          "handler_address": "0x0800b094",
+          "record_offset": "0x32e34",
+          "help": "Show recorded data - datalist [event/history/pov/puv/plv/bov/buv/inputov/coc/coca/doc/doca/sc/use][item/bat][batnun][volt/curr/temp/coul][item]"
+        },
+        {
+          "scope": "local",
+          "name": "disp",
+          "max_tokens": 5,
+          "required_mask": "0x01",
+          "handler_address": "0x0800a000",
+          "record_offset": "0x32e50",
+          "help": "Display Info at regular intervals - disp [(pwrs pwrNo)/val]/[(bats batNo)/volt/curr/temp]"
+        },
+        {
+          "scope": "local",
+          "name": "eepe",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x08010410",
+          "record_offset": "0x32e6c",
+          "help": "EEPROM erase - eepe [chip]"
+        },
+        {
+          "scope": "local",
+          "name": "eepr",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x08010228",
+          "record_offset": "0x32e88",
+          "help": "EEPROM read - eepr [chip][Offset][size]"
+        },
+        {
+          "scope": "local",
+          "name": "eepw",
+          "max_tokens": 5,
+          "required_mask": "0x0f",
+          "handler_address": "0x08010308",
+          "record_offset": "0x32ea4",
+          "help": "EEPROM write - eepw [chip][Offset][Val][size]"
+        },
+        {
+          "scope": "local",
+          "name": "flae",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801ffe0",
+          "record_offset": "0x32ec0",
+          "help": "Extend flash erase - flae [chip]"
+        },
+        {
+          "scope": "local",
+          "name": "flar",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801fec6",
+          "record_offset": "0x32edc",
+          "help": "Extend flash read - flar [chip][Offset][size]"
+        },
+        {
+          "scope": "local",
+          "name": "flaw",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x0801ff4c",
+          "record_offset": "0x32ef8",
+          "help": "Extend flash write - flaw [chip][Offset][Val]"
+        },
+        {
+          "scope": "local",
+          "name": "getpwr",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x0800ef84",
+          "record_offset": "0x32f14",
+          "help": "Get power Info - getpwr"
+        },
+        {
+          "scope": "local",
+          "name": "help",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x08024d66",
+          "record_offset": "0x32f30",
+          "help": "Help [cmd]"
+        },
+        {
+          "scope": "local",
+          "name": "info",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08028de4",
+          "record_offset": "0x32f4c",
+          "help": "Device infomation - info"
+        },
+        {
+          "scope": "local",
+          "name": "log",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x080175b8",
+          "record_offset": "0x32f68",
+          "help": "Log information show - log"
+        },
+        {
+          "scope": "local",
+          "name": "login",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x08025578",
+          "record_offset": "0x32f84",
+          "help": "Login Admin mode - login [password]"
+        },
+        {
+          "scope": "local",
+          "name": "logc",
+          "max_tokens": 1,
+          "required_mask": "0x03",
+          "handler_address": "0x08017794",
+          "record_offset": "0x32fa0",
+          "help": "Log clear - logc"
+        },
+        {
+          "scope": "local",
+          "name": "logout",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08025604",
+          "record_offset": "0x32fbc",
+          "help": "user mode  - logout"
+        },
+        {
+          "scope": "local",
+          "name": "logt",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x080177c8",
+          "record_offset": "0x32fd8",
+          "help": "Log test - logt [data]"
+        },
+        {
+          "scope": "local",
+          "name": "lg",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x0802873e",
+          "record_offset": "0x32ff4",
+          "help": "LG State - lg [cstm/sys][en/dis]"
+        },
+        {
+          "scope": "local",
+          "name": "md",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x080253b4",
+          "record_offset": "0x33010",
+          "help": "Memory dump - md [width][Addr][size]"
+        },
+        {
+          "scope": "local",
+          "name": "mm",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x080254ee",
+          "record_offset": "0x3302c",
+          "help": "Memory set - mm [width][Addr][Val]"
+        },
+        {
+          "scope": "local",
+          "name": "prot",
+          "max_tokens": 3,
+          "required_mask": "0x03",
+          "handler_address": "0x0800e96c",
+          "record_offset": "0x33048",
+          "help": "Protect ctrl - prot [bov/bhv/blv/buv/pov/phv/plv/puv/cbot/cbht/cblt/cbut/dbot/dbht/dblt/dbut/pot/pht/plt/put/coc/coc2/coca/doc/doc2/doca/sc/buzz/smartchg/default][en/dis]"
+        },
+        {
+          "scope": "local",
+          "name": "pwr",
+          "max_tokens": 2,
+          "required_mask": "0x01",
+          "handler_address": "0x08007a1c",
+          "record_offset": "0x33064",
+          "help": "Power data show - pwr [index]"
+        },
+        {
+          "scope": "local",
+          "name": "save",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x08009074",
+          "record_offset": "0x33080",
+          "help": "Save data - save [event/history]"
+        },
+        {
+          "scope": "local",
+          "name": "setprt",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802a4b4",
+          "record_offset": "0x3309c",
+          "help": "set protocol type - setprt [sma/lg]"
+        },
+        {
+          "scope": "local",
+          "name": "setlowcfg",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800fc58",
+          "record_offset": "0x330b8",
+          "help": "set Low config- setlowcfg [save] / [shutsoc/sstime] [num]"
+        },
+        {
+          "scope": "local",
+          "name": "setsoc",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0800fbd0",
+          "record_offset": "0x330d4",
+          "help": "Set SOC - setsoc [val]"
+        },
+        {
+          "scope": "local",
+          "name": "autoswitch",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800fce8",
+          "record_offset": "0x330f0",
+          "help": "ctrl auto-switching enable/disable - autoswitch [1/0]"
+        },
+        {
+          "scope": "local",
+          "name": "shut",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x0800c498",
+          "record_offset": "0x3310c",
+          "help": "Shut down - shut"
+        },
+        {
+          "scope": "local",
+          "name": "stat",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08008a60",
+          "record_offset": "0x33128",
+          "help": "Statistic data show - stat"
+        },
+        {
+          "scope": "local",
+          "name": "statc",
+          "max_tokens": 1,
+          "required_mask": "0x03",
+          "handler_address": "0x08009036",
+          "record_offset": "0x33144",
+          "help": "Clear statistic - statc"
+        },
+        {
+          "scope": "local",
+          "name": "tsoftdsg",
+          "max_tokens": 1,
+          "required_mask": "0x0f",
+          "handler_address": "0x0802b73c",
+          "record_offset": "0x33160",
+          "help": "Test Soft DSG - tsoftdsg"
+        },
+        {
+          "scope": "local",
+          "name": "tbar",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802b080",
+          "record_offset": "0x3317c",
+          "help": "Test write Barcode - tbar[reg]"
+        },
+        {
+          "scope": "local",
+          "name": "tbuz",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802afec",
+          "record_offset": "0x33198",
+          "help": "Test Buzzer - tbuz"
+        },
+        {
+          "scope": "local",
+          "name": "tchgc",
+          "max_tokens": 3,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f75c",
+          "record_offset": "0x331b4",
+          "help": "test Charge current - tchgc[curr][currLimit]"
+        },
+        {
+          "scope": "local",
+          "name": "tclear",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0800fb00",
+          "record_offset": "0x331d0",
+          "help": "test clear record on chip- tclear"
+        },
+        {
+          "scope": "local",
+          "name": "tibcio",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802b2e0",
+          "record_offset": "0x331ec",
+          "help": "Test ibc io - tibcio [nc/sc]"
+        },
+        {
+          "scope": "local",
+          "name": "tcan",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802a5f0",
+          "record_offset": "0x33208",
+          "help": "Test can port - tcan [port#]"
+        },
+        {
+          "scope": "local",
+          "name": "tcbnio",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802b408",
+          "record_offset": "0x33224",
+          "help": "Test cbn io - tcbnio [nc/sc]"
+        },
+        {
+          "scope": "local",
+          "name": "tdip",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802af60",
+          "record_offset": "0x33240",
+          "help": "Test Dip - tdip [flag]"
+        },
+        {
+          "scope": "local",
+          "name": "tdisc",
+          "max_tokens": 3,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f888",
+          "record_offset": "0x3325c",
+          "help": "test discharge current - tdisc[curr][currLimit]"
+        },
+        {
+          "scope": "local",
+          "name": "teepr",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0801045a",
+          "record_offset": "0x33278",
+          "help": "Device EEPROM test - teepr"
+        },
+        {
+          "scope": "local",
+          "name": "tetmp",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f654",
+          "record_offset": "0x33294",
+          "help": "test enviroment temperature - tetmp"
+        },
+        {
+          "scope": "local",
+          "name": "tflash",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802b598",
+          "record_offset": "0x332b0",
+          "help": "Device Flash test - tflash"
+        },
+        {
+          "scope": "local",
+          "name": "ti2c",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802a8c0",
+          "record_offset": "0x332cc",
+          "help": "I2C test - ti2c"
+        },
+        {
+          "scope": "local",
+          "name": "time",
+          "max_tokens": 7,
+          "required_mask": "0x01",
+          "handler_address": "0x080289cc",
+          "record_offset": "0x332e8",
+          "help": "Time - time [year] [month] [day] [hour] [minute] [second]"
+        },
+        {
+          "scope": "local",
+          "name": "cmudtesttime",
+          "max_tokens": 7,
+          "required_mask": "0x01",
+          "handler_address": "0x08028b70",
+          "record_offset": "0x33304",
+          "help": "Device Test Time - cmudtesttime [year] [month] [day] [hour] [minute] [second]"
+        },
+        {
+          "scope": "local",
+          "name": "tinput",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0802b1b8",
+          "record_offset": "0x33320",
+          "help": "test input state - tinput [rv/dcov/absent/present]"
+        },
+        {
+          "scope": "local",
+          "name": "tled",
+          "max_tokens": 3,
+          "required_mask": "0x05",
+          "handler_address": "0x0802aa34",
+          "record_offset": "0x3333c",
+          "help": "Test Led - tled [0/lednum/on/off] [on/off]"
+        },
+        {
+          "scope": "local",
+          "name": "tmos",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f998",
+          "record_offset": "0x33358",
+          "help": "test mosfet - tmos [cfet/dfet]"
+        },
+        {
+          "scope": "local",
+          "name": "tmprctrl",
+          "max_tokens": 4,
+          "required_mask": "0x0f",
+          "handler_address": "0x0800ee1c",
+          "record_offset": "0x33374",
+          "help": "Bat tmpr ctrl - tmprctrl [flag]/[flag][batid][val]"
+        },
+        {
+          "scope": "local",
+          "name": "trst",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x0802b024",
+          "record_offset": "0x33390",
+          "help": "Test Soft Reset - trst"
+        },
+        {
+          "scope": "local",
+          "name": "tusart",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802a760",
+          "record_offset": "0x333ac",
+          "help": "Usart test - tusart"
+        },
+        {
+          "scope": "local",
+          "name": "ttmp",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f548",
+          "record_offset": "0x333c8",
+          "help": "test battery temperature - ttmp"
+        },
+        {
+          "scope": "local",
+          "name": "tdct",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x080293b4",
+          "record_offset": "0x333e4",
+          "help": "Test dry ct - tdct"
+        },
+        {
+          "scope": "local",
+          "name": "euro",
+          "max_tokens": 4,
+          "required_mask": "0x01",
+          "handler_address": "0x080191d6",
+          "record_offset": "0x33400",
+          "help": "dsplay Euro stat list - euro"
+        },
+        {
+          "scope": "local",
+          "name": "eurostub",
+          "max_tokens": 4,
+          "required_mask": "0x01",
+          "handler_address": "0x0801953c",
+          "record_offset": "0x3341c",
+          "help": "stub Euro stat list - eurostub"
+        },
+        {
+          "scope": "local",
+          "name": "tbld",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802b50c",
+          "record_offset": "0x33438",
+          "help": "Test bleeding - tbld [val]"
+        },
+        {
+          "scope": "local",
+          "name": "updata",
+          "max_tokens": 1,
+          "required_mask": "0x01",
+          "handler_address": "0x08028d1e",
+          "record_offset": "0x33454",
+          "help": "updata system - updata"
+        },
+        {
+          "scope": "local",
+          "name": "tvolt",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0800f418",
+          "record_offset": "0x33470",
+          "help": "test battery voltage - tvolt"
+        },
+        {
+          "scope": "local",
+          "name": "twdg",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802af30",
+          "record_offset": "0x3348c",
+          "help": "Stop feeding watchdog - wdg"
+        },
+        {
+          "scope": "local",
+          "name": "emptyvolt",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802a174",
+          "record_offset": "0x334a8",
+          "help": "Set empty volt - emptyvolt [val]"
+        },
+        {
+          "scope": "local",
+          "name": "totalcoul",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x08029f10",
+          "record_offset": "0x334c4",
+          "help": "Set total coul - totalcoul [val]"
+        },
+        {
+          "scope": "local",
+          "name": "pwrsys",
+          "max_tokens": 2,
+          "required_mask": "0x05",
+          "handler_address": "0x0801469c",
+          "record_offset": "0x334e0",
+          "help": "power system info display"
+        },
+        {
+          "scope": "local",
+          "name": "urates",
+          "max_tokens": 2,
+          "required_mask": "0x03",
+          "handler_address": "0x0802a23c",
+          "record_offset": "0x334fc",
+          "help": "Set R485 Port Rate - urates [500000/115200/9600]"
+        },
+        {
+          "scope": "local",
+          "name": "trdagevolt",
+          "max_tokens": 1,
+          "required_mask": "0x05",
+          "handler_address": "0x0802a30c",
+          "record_offset": "0x33518",
+          "help": "read age volt"
+        },
+        {
+          "scope": "local",
+          "name": "inar",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x080217a6",
+          "record_offset": "0x33534",
+          "help": "INA226 SOC read - socr[Offset]"
+        },
+        {
+          "scope": "local",
+          "name": "inaw",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x08021814",
+          "record_offset": "0x33550",
+          "help": "INA226 SOC write - socw [Offset][Val]"
+        },
+        {
+          "scope": "local",
+          "name": "inash",
+          "max_tokens": 1,
+          "required_mask": "0x0f",
+          "handler_address": "0x0802189a",
+          "record_offset": "0x3356c",
+          "help": "INA226 SOC show reg -socsh"
+        },
+        {
+          "scope": "local",
+          "name": "inacal",
+          "max_tokens": 3,
+          "required_mask": "0x0f",
+          "handler_address": "0x0802190c",
+          "record_offset": "0x33588",
+          "help": "INA226 current calibration - currcal [val] - currcal"
+        },
+        {
+          "scope": "local",
+          "name": "currcal",
+          "max_tokens": 2,
+          "required_mask": "0x0f",
+          "handler_address": "0x08026f10",
+          "record_offset": "0x335a4",
+          "help": "current calibration - currcal [val] - currcal"
+        }
+      ],
+      "selector_tables": {
+        "config": {
+          "address": "0x08035164",
+          "selectors": [
+            "pov",
+            "povr",
+            "phv",
+            "phvr",
+            "plv",
+            "plvr",
+            "puv",
+            "puvr",
+            "pslp",
+            "bov",
+            "bovr",
+            "bhv",
+            "bhvr",
+            "blv",
+            "blvr",
+            "buv",
+            "buvr",
+            "bslp",
+            "bot",
+            "botr",
+            "bht",
+            "bhtr",
+            "blt",
+            "bltr",
+            "but",
+            "butr",
+            "coc",
+            "coca",
+            "cocar",
+            "doc",
+            "doca",
+            "docar",
+            "ocd",
+            "ocr",
+            "sc",
+            "scd",
+            "scr",
+            "clc",
+            "sleep",
+            "hwsleep",
+            "record",
+            "recinv",
+            "shuttime",
+            "uvtime",
+            "oc2d",
+            "oc2r",
+            "bsv",
+            "bv",
+            "save",
+            "default",
+            "eot",
+            "eotr",
+            "eht",
+            "ehtr",
+            "elt",
+            "eltr",
+            "eut",
+            "eutr",
+            "softtime",
+            "mot",
+            "motr",
+            "cocp",
+            "docp",
+            "ocpd",
+            "recuse",
+            "idle"
+          ]
+        },
+        "prot": {
+          "address": "0x08035270",
+          "selectors": [
+            "default",
+            "bov",
+            "bhv",
+            "blv",
+            "buv",
+            "bslp",
+            "cbot",
+            "cbht",
+            "cblt",
+            "cbut",
+            "dbot",
+            "dbht",
+            "dblt",
+            "dbut",
+            "pov",
+            "phv",
+            "plv",
+            "puv",
+            "pslp",
+            "pot",
+            "pht",
+            "plt",
+            "put",
+            "sc",
+            "doc2",
+            "doc",
+            "doca",
+            "coca",
+            "coc",
+            "coc2",
+            "buzz",
+            "smartchg",
+            "lcoul",
+            "mot"
+          ]
+        },
+        "ctrl": {
+          "address": "0x08029bf4",
+          "selectors": [
+            "cfet",
+            "dfet",
+            "buzz",
+            "heat",
+            "pwmc",
+            "pwmp",
+            "softstart",
+            "i2c",
+            "afuse",
+            "agelog",
+            "mostest"
+          ]
+        },
+        "datalist": {
+          "address": "0x0803514c",
+          "selectors": [
+            "id",
+            "volt",
+            "curr",
+            "temp",
+            "coul"
+          ]
+        }
+      }
+    }
+  ]
+}

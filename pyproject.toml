@@ -26,6 +26,8 @@ include = [
     "/tests/*.py",
     "/tests/README.md",
     "/docs/*.md",
+    "/docs/firmware-commands.json",
+    "/scripts/extract_firmware_commands.py",
     "/.github/workflows/*.yml",
     "/README.md",
     "/LICENSE",

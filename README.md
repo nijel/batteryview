@@ -319,7 +319,11 @@ skipped. CI uses only synthetic data on Windows, macOS, and Linux with Python
 3.11 and 3.14.
 
 See [protocol notes](docs/protocol.md) for the recovered command sequences,
-framing details, and remaining hardware acceptance checks.
+framing details, and remaining hardware acceptance checks. The
+[firmware command reference](docs/firmware-commands.md) catalogs all registered
+console commands in the two reviewed firmware images, including access modes,
+model differences and confirmed effects. Exact extracted metadata is available
+in [JSON](docs/firmware-commands.json).
 
 GUI, TCP adapters, XLSX exports, parameter editing, firmware updating, and
 arbitrary service scripts are outside this first implementation.

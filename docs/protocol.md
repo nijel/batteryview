@@ -171,6 +171,81 @@ does not reselect the previous module address after reset, since a reset can
 change it. Failure after a mutating write requires inspection
 of the saved recovery state; there is no automatic resume command.
 
+## Firmware evidence for SOC reset
+
+For all registered commands, access modes and per-image handler addresses, see the
+[firmware command reference](firmware-commands.md).
+
+Static inspection of the user-supplied firmware archive now establishes the erase
+scope for two specific images. Neither firmware was executed or flashed. The
+archive also contains an updater and example update logs; none of those logs or
+firmware payloads are included in this repository.
+
+| Image | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `US_E2_V2.5_Crc.bin` | 217088 | `897c3326ab8905df75a7297905112958a07c0a2cbb0592e0ecc274b886b0c82e` |
+| `US_C_V3.1_Crc.bin` | 242688 | `5450e3bd884ae63549fc3b278ecccc0126227234f7148c7961542755cbad2d7d` |
+
+Both are readable ARM Thumb images mapped at `0x08003800`. The inferred base is
+supported by command-table string/function pointers and valid reset-vector code.
+Addresses below are runtime addresses; subtract the base to obtain file offsets.
+The E2 board tag at file offset `0x418` is `US2000C_NF4`; the other image's tag is
+`US2000C`. These findings establish behavior in these images, not automatically
+in every installed firmware revision.
+
+### Erase and restart
+
+The command table describes `eepe` as `EEPROM erase - eepe [chip]`. In E2 V2.5,
+the handler at `0x08010410` accepts logical chip 0 or 1 and calls `0x080101ee`.
+That routine zeroes a 16-byte buffer through `0x08017dcc`, then writes that buffer
+128 times at offsets `i << 4`. Thus `eepe 0` attempts to overwrite **all 2048 bytes
+of logical EEPROM chip 0 with zero**, rather than clearing a single SOC field.
+Write statuses are combined for the command result. The driver at `0x0801004a`
+checks the 2048-byte boundary and handles page writes/readiness waits.
+
+C V3.1 has the same loop: handler `0x080103dc`, erase routine `0x08010142`, zero
+helper `0x08017c50`, and EEPROM write routine `0x0800ffa2`. Erasing chip 0 does
+not itself erase chip 1, external history flash, or executable firmware. This is
+not a guarantee that restart will leave all other storage unchanged: startup
+routines also initialize and update persistent data.
+
+In E2 V2.5, `trst` at `0x0802b024` performs preparatory calls and ultimately invokes
+`0x0801719c`, then `0x08016546`. The latter writes the AIRCR register at
+`0xe000ed0c`, preserving priority grouping and adding `0x05fa0004`: the keyed
+Cortex-M `SYSRESETREQ` operation. This is a processor/system reset, not merely
+closing a console session. See [Arm's reset documentation](https://arm-software.github.io/CMSIS_5/Core/html/group__NVIC__gr.html).
+
+### Confirmed E2 persistent fields
+
+The following addresses are **EEPROM byte offsets**, not firmware addresses.
+They are established by tracing both EEPROM reads/writes and the firmware's
+labeled output. A cleared stored field may subsequently be recomputed or updated;
+this table does not assert that every displayed value remains zero after restart.
+
+| Chip | Offset | Size | Evidence / meaning |
+| ---: | --- | ---: | --- |
+| 0 | `0x021` | 16 | Barcode: `tbar` at `0x0802b080` writes it at `0x0802b130` and reads it back at `0x0802b13c`. This explains BatteryView's explicit barcode restoration. |
+| 0 | `0x38f` | 124 | Saved statistics block: startup reads it into the per-module structure at `+0x88` through `0x08012654`–`0x0801265e`; `stat` at `0x08008a60` labels its fields. |
+| 0 | `0x38f` / `0x391` | 2 each | Event/history item counts in that block. Clearing these affects record bookkeeping even though the erase handler does not erase the external log payloads. |
+| 0 | `0x39f` | 2 | Saved `Pwr Percent`, read for `stat` at `0x08008c9e`. |
+| 0 | `0x3a1` | 4 | Saved `Pwr Coulomb`, reconstructed from two halfwords at `0x08008caa`–`0x08008cae`. |
+| 0 | `0x3df` | 2 | Cycle-count field, displayed as `CYCLE Times` at `0x08008c82`–`0x08008c90` after masking its high bit. |
+| 0 | `0x3ef` | 4 | Discharge-capacity accumulator, labeled `Dsg Cap` at `0x08008cbe`–`0x08008cca`. |
+| 1 | `0x021` | 8 | Configured nominal capacity, read by `totalcoul` at `0x08029f5e`–`0x08029f80`; its check byte is at `0x029`. Startup validates the supported capacity constants and falls back to a default if invalid. This is separate from chip-0 SOC/counter storage. |
+
+The erased statistics block also contains charge/discharge and fault counters.
+Chip 0 holds additional metadata/settings, so this procedure should be described
+as clearing a persistence area used by SOC and diagnostics, not a narrowly
+scoped percentage reset. There is a separate `setsoc` command in both command
+tables; the bundled BatteryView reset script does not call it.
+
+The evidence explains why the procedure can discard stale SOC/coulomb state and
+why support wants reports beforehand. It does **not** yet establish the exact
+post-reset SOC reconstruction algorithm, whether every parameter or calibration
+value survives, whether log records can be recovered after their bookkeeping is
+cleared, or why support requested the reset for a particular module. Those need
+further firmware analysis and/or manufacturer confirmation.
+
 ## Monitoring
 
 `OnGetpwrs` uses `getpwr` for a single module, or `getpwr N` for addressed reads,
