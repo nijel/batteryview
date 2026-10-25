@@ -85,8 +85,8 @@ installed modules. Reject absent placeholders when building a collection list.
 | `datalist kind [start]` | Start is a decimal record index, not a requested count. Lists summary rows and may paginate. Determine the available count instead of probing arbitrarily high indices. |
 | `datalist kind dtls start` | Handler-recognized detailed form omitted from help. `start` is D. This is separate from `data kind index`, which retrieves an individual record. |
 | `datalist kind ...` | Additional `item`/`bat` selections and `id/volt/curr/temp/coul` field selectors exist. Their complete positional combinations, per-cell numbering and limits remain unverified; do not derive a query builder from the help string alone. |
-| `save {event\|history}` | Requests record creation. It is a write operation; completion/persistence details of the record-storage callback remain unverified. |
-| `datac {event\|history\|event_log\|use}` | Chooses the collection to clear. Exact payload erasure versus count/index clearing must be traced per kind; it is not a general EEPROM erase. |
+| `save [event\|history]` | No argument defaults to event; `event` selects callback argument 0 and `history` selects 1. Unknown names fail. Tail-calls the module record-save callback, propagating its return status. Actual payload completion/persistence still depends on that callback. |
+| `datac [event\|history\|event_log\|use]` | No argument resets **both event and history bookkeeping without entering the flash-erasure loop**. Explicit event/history also erases the corresponding flash allocation. The other kinds clear separate counters/metadata. See the storage map below; this is not a general EEPROM erase. |
 | `log [count]` | Separate diagnostic ring. Count is D, **1–32**. No argument uses the available count, or 32 for a wrapped ring. Traverses newest first; records are 20 bytes at EEPROM 0 `0x6c + index*20`. Behavior when requesting more than the available entries should not be used to infer valid historical records. |
 | `logc` | Clears diagnostic-ring index/wrap state and writes a two-byte zero at EEPROM 0 `0x387`. This does not establish that old payload bytes are erased. |
 | `logt value` | Value is H. Injects an internal test-log event through the logger with code `0x600`, source/argument 1 and the supplied 32-bit value. |
@@ -102,6 +102,38 @@ Evidence: E2 `data` `0x080092f8` (default/index logic `0x08009324`–`0x080093e0
 `datalist` comparison `0x0800ba8a`, `log` `0x080175b8`, `logc`
 `0x08017794`, `statc` `0x08009036`, `tcycle` `0x0800f32c`. C `statc`
 `0x08008ff0` has the same preservation pattern.
+
+### `datac`: bookkeeping and payload erasure are different operations
+
+E2 handler `0x08029d08`–`0x08029edc` accepts no operand or one of the four
+literal names. It initializes a zero-filled temporary buffer, selects a storage
+descriptor for the requested kind, and performs these operations:
+
+| Form | Confirmed runtime and persistent changes |
+| --- | --- |
+| `datac` | Zeros event write-index at EEPROM 0 `0x389`, event count at `0x38f`, history write-index at `0x38b`, history count at `0x391` (two bytes each), with corresponding RAM fields. Skips the flash-erasure loop because both kinds were selected. Old payload bytes are not physically erased by this path. |
+| `datac event` | Same event-index/count clearing, then flash-erasure loop over the event descriptor's allocation. |
+| `datac history` | Same history-index/count clearing, then flash-erasure loop over the history descriptor's allocation. |
+| `datac event_log` | Clears 22 bytes of runtime event-specific counters beginning at module offset `0x104`, then writes 22 zero bytes at EEPROM **1** `0x658`. No event/history flash-erasure loop. This is separate from the internal diagnostic `logc` ring. |
+| `datac use` | Zeros the two runtime halfwords at module `0x11a/0x11c`, four EEPROM-1 bytes at `0x66e`, and seven EEPROM-0 bytes at `0x40d`. No event/history flash-erasure loop. |
+
+The explicit event/history paths get their start address, allocation length and
+erase granularities from runtime storage descriptors. The loop calls flash
+helpers `0x0801fd48` / `0x0801fd98`, which emit address-bearing SPI commands
+`0x20` / `0x52`. Exact allocation addresses and chip-specific erase geometry
+remain to be established; neither is a command parameter.
+
+Bookkeeping is reset **before** payload erasure. EEPROM return codes are
+accumulated; a nonzero total produces handler return 5. The erase-helper results
+are not accumulated into that total. Bad alignment can return 1 after prior
+changes. Consequently a failed command can already have changed counts, and a
+success footer alone does not verify every erase completed. Do not retry this
+operation as though it were a read or claim transactional clearing.
+
+`save` at `0x08009074` dispatches through `0x080073ec`; no argument selects an
+event. It requests a fresh record, rather than flushing every existing record or
+saving configuration. The callback's physical storage sequence remains a
+separate analysis task.
 
 ## SOC, capacity and small configuration settings
 
@@ -215,7 +247,7 @@ parser's permissiveness.
 
 E2 dispatch is at `0x0800cc14`, using the selector order retained in JSON.
 Threshold branches validate against **other current settings**, not just fixed
-minimum/maximum constants. The following pack-voltage bounds are taken from the
+minimum/maximum constants. The following pack/cell-voltage bounds are taken from the
 comparisons, including endpoint strictness:
 
 | Key | Unit | Setter condition for value x |
@@ -228,25 +260,33 @@ comparisons, including endpoint strictness:
 | `plvr` | mV | `plv < x < 65000` |
 | `puv` | mV | `pslp < x < min(plv, puvr)` |
 | `puvr` | mV | `puv < x <= 65000` |
+| `pslp` | mV | `20000 <= x < puv` |
+| `bov` | mV | `max(bhv, bovr) < x <= 7000` |
+| `bovr` | mV | `100 <= x < bov` |
+| `bhv` | mV | `max(blv, bhvr) < x < bov` |
+| `bhvr` | mV | `100 <= x < bhv` |
+| `blv` | mV | `buv < x < min(bhv, blvr)` |
+| `blvr` | mV | `blv < x <= 7000` |
+| `buv` | mV | `bslp < x < min(blv, buvr)` |
+| `buvr` | mV | `buv < x <= 7000` |
+| `bslp` | mV | `100 <= x < buv` |
 
-E2 pack-voltage branches: `0x0800cc9c`–`0x0800ceca`. These limits describe
+E2 pack/cell-voltage branches: `0x0800cc9c`–`0x0800d1c2`. These limits describe
 firmware acceptance, not recommended battery operating values.
 
 The other selector groups and their confirmed units/roles are:
 
 | Selectors | Meaning and parameter status |
 | --- | --- |
-| `pslp` | Pack sleep-voltage threshold, mV; compared against PUV and a fixed lower limit. Exact lower bound remains to be recorded. |
-| `bov bovr bhv bhvr blv blvr buv buvr bslp` | Cell-voltage thresholds/recovery fields, mV, with cross-field ordering checks. Exact constant bounds must be taken from each branch before implementing writes. |
 | `bot botr bht bhtr blt bltr but butr` | Battery temperature protection/recovery fields, mC. Branches operate on charge/discharge-related fields; do not assume a single universal temperature limit. |
 | `eot eotr eht ehtr elt eltr eut eutr` | Environment temperature thresholds/recovery; individual cross-field and constant bounds need completion. Some diagnostic strings contain incorrect field names. |
 | `mot motr` | Additional temperature-protection/recovery branches. Physical sensor mapping and exact bounds remain unverified. |
 | `coc coca cocar` | Charge current protection/alarm/recovery values, mA. Ordering depends on the current related fields and short-circuit threshold. |
 | `doc doca docar` | Discharge current protection/alarm/recovery values, **negative mA** in the validation strings and signed parser. Do not send unsigned magnitudes as charge/discharge-interchangeable values. |
-| `sc` | Short-circuit threshold, negative mA, constrained relative to DOC and negative COC. |
-| `ocd ocr oc2d oc2r scd scr` | Protection delay/recovery values, displayed in ms; exact inclusive bounds/quantization require each branch, not the printed `a ~ b` message alone. |
-| `clc` | Current-limit value, mA; depends on runtime limits. |
-| `bsv bv` | Balancing-related voltage parameters, mV. Error messages advertise 2800–3600 and 30–100 respectively; precise endpoint acceptance still needs branch verification. |
+| `sc` | Short-circuit threshold, negative mA: **−300000 <= x < min(0, doc, −coc)**. Strictly below both related thresholds. |
+| `ocd ocr oc2d oc2r scd scr` | Protection delay/recovery values, ms; exact bounds and the `oc2d` signedness bug are listed below. |
+| `clc` | Current-limit value, mA: **1–10000 inclusive**. Stores the same value in pack and cell parameter structures. |
+| `bsv bv` | Balancing-related voltage parameters, mV: **BSV 2800–3600 inclusive**, **BV 30–100 inclusive**. Both endpoints confirmed by unsigned subtraction/range comparisons. |
 | `recinv` | D interval multiplier **1–65536 inclusive**. Displayed recording interval is the supplied multiplier times the module's base interval; the raw value is not necessarily seconds. |
 | `uvtime` | D seconds **0–864000 inclusive** (ten days). Updates a runtime under-voltage timer field. |
 | `recuse idle` | S values **1–365 inclusive**, displayed in days. Change the use-record interval / idle-time fields. |
@@ -265,6 +305,31 @@ restore-default callbacks, changes scheduling values and writes that interval
 field too. These are state-changing actions, not ways to display defaults.
 The full callback storage map is not yet established; do not describe either as
 an erase of all settings. Branches `0x0800e472`–`0x0800e5b2`.
+
+### Delay/recovery limits and a signedness bug
+
+All setters have form `config key value`, using the common **S** parser; the
+query form omits value. Accepted conditions below describe the comparisons,
+not merely the diagnostic strings:
+
+| Key | Accepted value in milliseconds | E2 setter branch |
+| --- | --- | --- |
+| `ocd` | 2000–300000 inclusive | `0x0800d6d8` |
+| `ocr` | 2000–300000 inclusive | `0x0800d744` |
+| `scd` | 0–31 inclusive | `0x0800d818` |
+| `scr` | 2000–300000 inclusive | `0x0800d860` |
+| `oc2d` | Signed comparison accepts **any parsed value <= 5000**, including negative values | `0x0800e35c` |
+| `oc2r` | 500–60000 inclusive | `0x0800e3a8` |
+
+The unsigned subtraction checks in the bounded branches reject negative values.
+`oc2d` instead uses a signed `< 5001` comparison and has **no zero lower check**,
+despite printing `0 ~ 5000 ms` on error. Future clients should enforce 0–5000;
+the effect of a negative stored delay on timer consumers remains unverified.
+Successful setters copy the raw value to pack and cell parameter structures;
+there is no rounding at this point. Later timer resolution and persistence are
+separate from the parser contract.
+
+`clc` bounds are at `0x0800d8b4`; `bsv`/`bv` at `0x0800e3f8`/`0x0800e44c`.
 
 ### Scheduling forms
 
@@ -402,23 +467,23 @@ runtime injected readings/flags, not temperature calibration EEPROM writes.
 | `tled selector [on\|off]` | Numeric LED selection and special group/all paths exist; complete selector/action combinations remain unverified. |
 | `tmos {cfet\|dfet}` | Chooses the charge/discharge MOSFET test. Timing, restoration and required external conditions remain unverified. |
 | `tibcio {nc\|sc}`, `tcbnio {nc\|sc}` | Exact string choices; electrical meaning, expected fixture conditions and side effects remain unverified. |
-| `tver version` (C) | Version operand advertised. Encoding, comparison versus mutation and persistence remain unverified. |
+| `tver version` (C) | Required **H** value, compared with the runtime software-version word; it **does not set a version**. Prints pass/fail and the actual version as `V(high bits).(low byte)`, then returns zero even on mismatch. C `0x0800fbdc`–`0x0800fc34`. |
 
-### No-operand handlers needing hardware-effect review
+### No-operand hardware handlers
 
 The registered token ceiling confirms that the following accept **no additional
-console operands**. Their purpose comes from help; this does not establish a
-complete electrical test procedure:
+console operands**. Handler-confirmed details are identified explicitly; the
+remaining help-based purposes do not establish a complete electrical test procedure:
 
 | Command | Advertised role / remaining question |
 | --- | --- |
 | `tbuz` | Buzzer test; duration/restoration unverified. |
-| `tetmp` | Environment-temperature test; exact plausibility bounds unverified. |
+| `tetmp` | E2 computes the signed integer average of cell temperatures, refreshes two module sensor fields via callbacks and checks **each lies between average −10000 and average +30000 mC inclusive**. Prints pass/fail and sensor/average values, but returns zero even on test failure. Handler `0x0800f654`–`0x0800f70a`; physical identity of the two sensors remains unverified. |
 | `tflash` | Flash test; modified region/restoration unverified. |
 | `ti2c` | I2C test; buses/devices and writes unverified. |
 | `tusart` | USART test; loopback/port requirements unverified. |
 | `tdct` | Dry-contact test; output sequence/restoration unverified. |
-| `tclear` | Record-clearing test; exact storage scope unverified. |
+| `tclear` | E2 zeros event/history write indices at EEPROM 0 `0x389/0x38b`, diagnostic-log index at `0x387` (two bytes each), and associated RAM count/wrap fields. Clears the same runtime statistics as `statc`, preserving reset/life-warning/life-alarm counts, then invokes its state callback. Also zeroes 0x128 runtime bytes at module `0x104` and calls `0x0800457a`; that callee’s further effects remain unverified. No flash-erasure loop in this handler. Prints the pass string and returns zero without checking EEPROM write results; **not equivalent to datac or full EEPROM erase**. E2 `0x0800fb00`–`0x0800fbb2`. |
 | `tsoftdsg` | Soft-discharge test; power-path effects and duration unverified. |
 | `trdagevolt` | Recorded aging-voltage report; record format and scope unverified. |
 | `tagevolt` (C) | Aging-voltage test; storage/output effects unverified. |

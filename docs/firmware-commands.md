@@ -123,12 +123,12 @@ acronyms and undocumented argument meanings are left unresolved.
 | `statc` | Clear most runtime statistics, preserving selected counters; invokes a state callback. Not EEPROM erase. | L/R:C | L/R:C | V |
 | `data <kind> [item]` | Show a recorded item; the no-item/default path is handler-dependent. | L/R:U | L/R:U | V |
 | `datalist <kind> [selection...]` | List recorded data; handler also supports the unadvertised dtls form. | L:U | L:U | V |
-| `datac <event\|history\|event_log\|use>` | Clear selected recorded-data bookkeeping/storage; exact scope varies by kind. | L:C | L:C | H |
-| `save <event\|history>` | Request an event/history record to be saved. | L:D | L:D | H |
+| `datac [event\|history\|event_log\|use]` | Clear record metadata; explicit event/history also enters flash erasure, while bare form resets both counts. | L:C | L:C | V |
+| `save [event\|history]` | Request a record; defaults to event. | L:D | L:D | V |
 | `log [data]` | Show internal diagnostic log information. | L:U | L:U | V |
 | `logc` | Clear internal log count/wrap bookkeeping; E2 writes chip-0 offset 0x387. | L:C | L:C | V |
 | `logt <data>` | Generate test log data. | L:D | L:D | V |
-| `tclear` | Test routine for clearing on-chip records; exact scope needs review. | L:E | L:E | H |
+| `tclear` | Clear record indices, runtime counts/statistics and additional record state; callback effects remain partly unresolved. | L:E | L:E | V |
 | `tcycle [cycle-times]` | Set/test the cycle-count value; do not treat as a read. | L:D | L:D | V |
 
 ### Configuration, protection and SOC
@@ -200,7 +200,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | `tvolt [value]` | Cell voltage test; E2 optional value is allowed spread in mV. | L:E | L:E | V |
 | `tpwr` | Test total module voltage; C only. | — | L:E | H |
 | `ttmp [value]` | Cell temperature test; E2 optional value is allowed spread in mC. | L:E | L:E | V |
-| `tetmp` | Environment-temperature test. | L:E | L:E | H |
+| `tetmp` | Compare two temperature sensors against the cell-temperature average; E2 accepts −10/+30 °C offsets. | L:E | L:E | V |
 | `tinput <rv\|dcov\|absent\|present>` | Test selected input condition; present/absent branches invoke hardware callbacks. | L:E | L:E | V |
 | `tmos <cfet\|dfet>` | Test selected MOSFET. | L:E | L:E | H |
 | `teepr` | EEPROM write/read test; E2 temporarily writes 0x55 at offset 0x26 on both chips, then restores it. | L:E | L:E | V |
@@ -214,7 +214,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | `tcbnio <nc\|sc>` | Test CBN I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | H |
 | `tmprctrl <flag> [bat-id value]` | Inject runtime temperature or voltage by flag and selector; short form restores measurement flags. | L:D | L:D | V |
 | `tsto` | Test self-test output; C only. | — | L:E | H |
-| `tver <version>` | Test/set software-version test value; C only, exact scope needs review. | — | L:E | H |
+| `tver <version>` | Compare hexadecimal value with actual software version; C only, does not set it. | — | L:E | V |
 | `tdct` | Run dry-contact test. | L:E | L:E | H |
 | `tbld` | Run bleeding/balancing test; help advertises val but table accepts no extra token. | L:E | L:E | H |
 | `twdg` | Stop feeding watchdog; help says wdg but only twdg is registered. | L:E | L:E | H |
