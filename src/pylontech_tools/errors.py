@@ -1,11 +1,11 @@
 """Errors carry partial responses so failed collections remain useful."""
 
 
-class BatteryViewError(Exception):
+class PylontechError(Exception):
     """Base class for user-facing errors."""
 
 
-class ProtocolError(BatteryViewError):
+class ProtocolError(PylontechError):
     """The device returned an unexpected or malformed response."""
 
     def __init__(self, message: str, *, response: str = "", context: dict | None = None):
@@ -30,7 +30,7 @@ class UnsupportedCommand(ProtocolError):
     """The console rejected a command."""
 
 
-class ResetRecoveryError(BatteryViewError):
+class ResetRecoveryError(PylontechError):
     """A reset was interrupted; consult the saved recovery state before continuing."""
 
     def __init__(self, message: str, *, recovery_path: str):

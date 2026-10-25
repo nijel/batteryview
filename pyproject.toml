@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "batteryview"
+name = "pylontech-tools"
 version = "0.1.0"
 description = "Portable Pylontech console client and BatteryView-compatible reports"
 readme = "README.md"
@@ -15,14 +15,14 @@ dependencies = ["pyserial>=3.5,<4"]
 test = ["pytest>=8", "ruff>=0.11"]
 
 [project.scripts]
-batteryview = "batteryview.cli:main"
+pylontech-console = "pylontech_tools.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/batteryview"]
+packages = ["src/pylontech_tools"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/src/batteryview/*.py",
+    "/src/pylontech_tools/*.py",
     "/tests/*.py",
     "/tests/README.md",
     "/docs/**/*.rst",

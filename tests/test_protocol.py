@@ -1,13 +1,13 @@
 import pytest
 
-from batteryview.errors import (
+from pylontech_tools.errors import (
     CommandCancelled,
     CommandTimeout,
     ConnectionError,
     ProtocolError,
     UnsupportedCommand,
 )
-from batteryview.protocol import CONTINUATION, Response
+from pylontech_tools.protocol import CONTINUATION, Response
 
 
 @pytest.mark.parametrize("chunk_size", [1, 2, 7, 65536])
@@ -140,9 +140,9 @@ def test_disconnect_retains_partial_response(replay):
 
 
 def test_connection_handshake(replay, monkeypatch):
-    from batteryview.protocol import SHIFT_SEQUENCE
+    from pylontech_tools.protocol import SHIFT_SEQUENCE
 
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     session, transport = replay(
         [
             (SHIFT_SEQUENCE, ""),
@@ -169,7 +169,7 @@ def test_connection_handshake(replay, monkeypatch):
     ],
 )
 def test_connect_uses_final_prompt(replay, monkeypatch, initial, login_response, expected_error):
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     exchanges = [(b"\n", initial)]
     if login_response is not None:
         exchanges.append((b"login debug\n", login_response))
@@ -187,7 +187,7 @@ def test_connect_uses_final_prompt(replay, monkeypatch, initial, login_response,
 
 
 def test_reconnect_without_debug_keeps_script_login_explicit(replay, monkeypatch):
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     session, transport = replay([(b"\n", "\rpylon>")])
     session.settle_time = 0
     session.connect(shift=False, enter_debug=False)
@@ -196,7 +196,7 @@ def test_reconnect_without_debug_keeps_script_login_explicit(replay, monkeypatch
 
 
 def test_login_timeout_is_not_ignored(replay, monkeypatch):
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     session, transport = replay([(b"\n", "\rpylon>"), (b"login debug\n", "partial")], timeout=0.005)
     session.settle_time = 0
     with pytest.raises(CommandTimeout):

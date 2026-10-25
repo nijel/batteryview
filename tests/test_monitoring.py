@@ -1,9 +1,9 @@
 import pytest
 from conftest import ScriptedSession
 
-from batteryview import BatteryClient, ProtocolError, UnsupportedCommand
-from batteryview.parsers import parse_getpwr, parse_info, parse_pwr
-from batteryview.protocol import Response
+from pylontech_tools import BatteryClient, ProtocolError, UnsupportedCommand
+from pylontech_tools.parsers import parse_getpwr, parse_info, parse_pwr
+from pylontech_tools.protocol import Response
 
 PWR = (
     "pwr\n\r@\r\nPower Volt Curr Tempr Base.St Volt.St Curr.St Temp.St Coulomb FutureField\r\n"
@@ -47,7 +47,7 @@ def test_pwr_units_unknown_columns_and_alarms():
 def test_labeled_pwr_preserves_module_address_units_statuses_and_raw_fields(caplog):
     import logging
 
-    with caplog.at_level(logging.DEBUG, logger="batteryview.parsers"):
+    with caplog.at_level(logging.DEBUG, logger="pylontech_tools.parsers"):
         modules = parse_pwr(PWR_LABELED)
     assert len(modules) == 1
     module = modules[0]
@@ -282,7 +282,7 @@ def test_malformed_monitoring_fails_without_fabricated_readings():
 def test_watch_count_and_interval(monkeypatch):
     client = BatteryClient(session=ScriptedSession([]))
     monkeypatch.setattr(client, "snapshot", lambda: "snapshot")
-    monkeypatch.setattr("batteryview.client.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.client.time.sleep", lambda _: None)
     assert list(client.watch(count=2)) == ["snapshot", "snapshot"]
     with pytest.raises(ValueError):
         next(client.watch(interval=0))
@@ -302,7 +302,7 @@ PWR_WITH_ABSENT = (
 
 @pytest.mark.parametrize("header", ["Power", "No"])
 def test_pwr_absent_slots_are_not_readings_or_alarms(header, caplog):
-    with caplog.at_level("DEBUG", logger="batteryview.parsers"):
+    with caplog.at_level("DEBUG", logger="pylontech_tools.parsers"):
         modules = parse_pwr(PWR_WITH_ABSENT.replace("Power Volt", f"{header} Volt"))
     assert [m.address for m in modules] == [1, 4]
     assert [m.voltage_v for m in modules] == [50, 52]

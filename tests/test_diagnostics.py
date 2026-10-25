@@ -2,9 +2,14 @@ import logging
 
 import pytest
 
-from batteryview import BatteryClient, CommandTimeout, ProtocolError
-from batteryview.diagnostics import SERIAL_TRACE, command_label, configure_logging, serial_logger
-from batteryview.protocol import ConsoleSession
+from pylontech_tools import BatteryClient, CommandTimeout, ProtocolError
+from pylontech_tools.diagnostics import (
+    SERIAL_TRACE,
+    command_label,
+    configure_logging,
+    serial_logger,
+)
+from pylontech_tools.protocol import ConsoleSession
 
 
 @pytest.mark.parametrize(
@@ -52,15 +57,15 @@ def test_trace_includes_escaped_bytes_only_when_requested(replay, capsys):
 
 def test_library_debug_does_not_enable_raw_serial(replay, caplog):
     session, _ = replay([(b"info\n", "Barcode : TEST_PRIVATE\rpylon_debug>")])
-    with caplog.at_level(logging.DEBUG, logger="batteryview"):
+    with caplog.at_level(logging.DEBUG, logger="pylontech_tools"):
         session.exchange("info")
     assert "Command complete" in caplog.text
     assert "TEST_PRIVATE" not in caplog.text
-    assert not any(r.name == "batteryview.serial" for r in caplog.records)
+    assert not any(r.name == "pylontech_tools.serial" for r in caplog.records)
 
 
 def test_logging_state_is_restored_and_raw_not_enabled_by_later_debug(capsys):
-    logger = logging.getLogger("batteryview")
+    logger = logging.getLogger("pylontech_tools")
     state = logger.level, logger.propagate, logger.handlers[:], serial_logger.level
     with configure_logging(trace_serial=True):
         serial_logger.log(SERIAL_TRACE, "raw trace")
@@ -130,10 +135,10 @@ def test_info_then_snapshot_checks_mode_after_disconnect(monkeypatch, capsys, ex
         def close(self):
             pass
 
-    monkeypatch.setattr("batteryview.client.SerialTransport", Transport)
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.client.SerialTransport", Transport)
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     monkeypatch.setattr(
-        "batteryview.client.ConsoleSession",
+        "pylontech_tools.client.ConsoleSession",
         lambda *args, **kwargs: ConsoleSession(*args, **kwargs, settle_time=0),
     )
     with configure_logging(debug=True):
@@ -148,7 +153,7 @@ def test_info_then_snapshot_checks_mode_after_disconnect(monkeypatch, capsys, ex
 
 
 def test_failed_login_logs_final_prompt_without_payload(replay, monkeypatch, capsys):
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     session, _ = replay(
         [(b"\n", "\rpylon>"), (b"login debug\n", "Invalid command TEST_PRIVATE\rpylon>")]
     )

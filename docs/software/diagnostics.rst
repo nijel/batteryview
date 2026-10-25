@@ -8,9 +8,9 @@ Diagnostic logging
 
 .. code:: sh
 
-   batteryview snapshot --port /dev/ttyUSB0 --debug
-   batteryview --debug snapshot --port /dev/ttyUSB0 --log-file debug.log
-   batteryview snapshot --port /dev/ttyUSB0 --trace-serial --log-file serial-trace.log
+   pylontech-console snapshot --port /dev/ttyUSB0 --debug
+   pylontech-console --debug snapshot --port /dev/ttyUSB0 --log-file debug.log
+   pylontech-console snapshot --port /dev/ttyUSB0 --trace-serial --log-file serial-trace.log
 
 On failure, stderr shows the failed command, available timing/framing context, and the last 4096
 bytes of its response, including timeout fragments. Control characters are escaped, truncation
@@ -40,6 +40,6 @@ Library callers configure standard Python logging themselves. For metadata:
 
    logging.basicConfig(level=logging.DEBUG)
 
-Raw I/O uses the separate ``batteryview.serial`` logger at level 5 (``TRACE``), below ``DEBUG``.
-Enable it explicitly with ``logging.getLogger("batteryview.serial").setLevel(5)`` and a handler
+Raw I/O uses the separate ``pylontech_tools.serial`` logger at level 5 (``TRACE``), below ``DEBUG``.
+Enable it explicitly with ``logging.getLogger("pylontech_tools.serial").setLevel(5)`` and a handler
 that accepts that level. The library installs no output handlers or root-logger configuration.

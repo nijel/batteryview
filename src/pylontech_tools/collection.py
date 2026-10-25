@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from .errors import BatteryViewError, CommandCancelled
+from .errors import CommandCancelled, PylontechError
 from .models import CollectionResult
 from .transcript import report_filename
 
@@ -29,7 +29,7 @@ def _now() -> str:
 
 def _application_version() -> str:
     try:
-        return version("batteryview")
+        return version("pylontech-tools")
     except PackageNotFoundError:
         return "unknown"
 
@@ -156,7 +156,7 @@ def collect(
                     step["artifact"] = artifact.name
                 client.last_failure = exc
                 interrupted = _record_failure(manifest_path, manifest, index, exc)
-                if interrupted or not isinstance(exc, (BatteryViewError, OSError, ValueError)):
+                if interrupted or not isinstance(exc, (PylontechError, OSError, ValueError)):
                     raise
                 return CollectionResult(directory, manifest_path, False)
             step["status"] = "complete"

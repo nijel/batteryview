@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 import serial
 
-from batteryview.errors import ConnectionError
-from batteryview.transport import SerialTransport
+from pylontech_tools.errors import ConnectionError
+from pylontech_tools.transport import SerialTransport
 
 
 def test_serial_settings_baud_reopen_and_io(monkeypatch):
@@ -164,7 +164,7 @@ def test_installed_cli_event_through_real_serial_transport(tmp_path):
             [
                 sys.executable,
                 "-m",
-                "batteryview",
+                "pylontech_tools",
                 "event",
                 "--port",
                 port,

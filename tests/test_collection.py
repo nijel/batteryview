@@ -6,16 +6,16 @@ from functools import partial
 import pytest
 from conftest import ReplayTransport, ScriptedSession
 
-from batteryview import (
+from pylontech_tools import (
     BatteryClient,
     CommandCancelled,
     CommandTimeout,
     ConnectionError,
     ProtocolError,
 )
-from batteryview.cli import main
-from batteryview.protocol import SHIFT_SEQUENCE, ConsoleSession, Response
-from batteryview.transcript import report_filename
+from pylontech_tools.cli import main
+from pylontech_tools.protocol import SHIFT_SEQUENCE, ConsoleSession, Response
+from pylontech_tools.transcript import report_filename
 
 FIXED_TIME = datetime(2000, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
@@ -27,10 +27,10 @@ def synthetic_clock(monkeypatch):
         def now(cls, tz=None):
             return FIXED_TIME.astimezone(tz)
 
-    monkeypatch.setattr("batteryview.collection.datetime", Clock)
-    monkeypatch.setattr("batteryview.collection._application_version", lambda: "0.0.test")
+    monkeypatch.setattr("pylontech_tools.collection.datetime", Clock)
+    monkeypatch.setattr("pylontech_tools.collection._application_version", lambda: "0.0.test")
     monkeypatch.setattr(
-        "batteryview.collection.report_filename",
+        "pylontech_tools.collection.report_filename",
         lambda barcode, kind: report_filename(barcode, kind, now=FIXED_TIME),
     )
 
@@ -285,7 +285,7 @@ def test_missing_barcode_keeps_vendor_unknown_sn_filenames(tmp_path, replay):
 
 
 def test_manifest_replacement_is_atomic_and_records_step_transitions(tmp_path, replay, monkeypatch):
-    import batteryview.collection as collection
+    import pylontech_tools.collection as collection
 
     replace = collection.os.replace
     transitions = []
@@ -308,7 +308,7 @@ def test_manifest_replacement_is_atomic_and_records_step_transitions(tmp_path, r
 
 
 def test_artifact_write_failure_keeps_partial_and_stops(tmp_path, replay, monkeypatch):
-    import batteryview.collection as collection
+    import pylontech_tools.collection as collection
 
     write_json = collection._write_json
 
@@ -330,7 +330,7 @@ def test_artifact_write_failure_keeps_partial_and_stops(tmp_path, replay, monkey
 def test_final_manifest_failure_raises_and_retains_previous_valid_state(
     tmp_path, replay, monkeypatch
 ):
-    import batteryview.collection as collection
+    import pylontech_tools.collection as collection
 
     write_manifest = collection._write_manifest
 
@@ -353,7 +353,7 @@ def test_final_manifest_failure_raises_and_retains_previous_valid_state(
 def test_cancellation_during_manifest_updates_records_interruption(
     tmp_path, replay, monkeypatch, transition
 ):
-    import batteryview.collection as collection
+    import pylontech_tools.collection as collection
 
     write_manifest = collection._write_manifest
     interrupted = False
@@ -402,9 +402,11 @@ def test_collect_cli_runs_one_handshake_and_disconnect_and_outputs_only_summary(
         transports.append(wire)
         return wire
 
-    monkeypatch.setattr("batteryview.client.SerialTransport", transport)
-    monkeypatch.setattr("batteryview.client.ConsoleSession", partial(ConsoleSession, settle_time=0))
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.client.SerialTransport", transport)
+    monkeypatch.setattr(
+        "pylontech_tools.client.ConsoleSession", partial(ConsoleSession, settle_time=0)
+    )
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     assert main(["collect", "--port", "SYNTHETIC_PORT", "--output", str(tmp_path / "support")]) == 0
     out, err = capsys.readouterr()
     summary = json.loads(out)
@@ -420,7 +422,7 @@ def test_connection_setup_failure_does_not_create_collection_artifacts(
     def fail(*args):
         raise ConnectionError("synthetic connection failure")
 
-    monkeypatch.setattr("batteryview.client.SerialTransport", fail)
+    monkeypatch.setattr("pylontech_tools.client.SerialTransport", fail)
     directory = tmp_path / "support"
     assert main(["collect", "--port", "SYNTHETIC_PORT", "--output", str(directory)]) == 1
     assert not directory.exists()

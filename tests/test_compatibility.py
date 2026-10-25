@@ -9,7 +9,7 @@ from conftest import ScriptedSession
 from test_monitoring import GETPWR, PWR
 from test_reports import INFO, reply, stat
 
-from batteryview import (
+from pylontech_tools import (
     BatteryClient,
     CommandTimeout,
     ConnectionError,
@@ -17,11 +17,11 @@ from batteryview import (
     ResetRecoveryError,
     UnsupportedCommand,
 )
-from batteryview.cli import CSV_FIELDS, _write_snapshot, main
-from batteryview.diagnostics import failure_diagnostic
-from batteryview.parsers import parse_getpwr
-from batteryview.profiles import PROFILES, MonitoringProfile, monitoring_profile
-from batteryview.protocol import Response
+from pylontech_tools.cli import CSV_FIELDS, _write_snapshot, main
+from pylontech_tools.diagnostics import failure_diagnostic
+from pylontech_tools.parsers import parse_getpwr
+from pylontech_tools.profiles import PROFILES, MonitoringProfile, monitoring_profile
+from pylontech_tools.protocol import Response
 
 
 def rows(indices):
@@ -75,7 +75,7 @@ def test_latest_index_overrides_stat_counter(tmp_path, kind, counter, caplog):
         report_start(kind, 1, stat_count=counter)
         + [(f"datalist {kind} dtls 0", reply(rows([0]))), ("", reply())]
     )
-    with caplog.at_level("DEBUG", logger="batteryview.client"):
+    with caplog.at_level("DEBUG", logger="pylontech_tools.client"):
         result = BatteryClient(session=session)._export(
             kind, tmp_path / "report.txt", progress=None
         )
@@ -415,7 +415,7 @@ def test_cli_reports_failed_communication_without_debug(monkeypatch, capsys):
         def __exit__(self, *args):
             pass
 
-    monkeypatch.setattr("batteryview.cli.BatteryClient", FailedClient)
+    monkeypatch.setattr("pylontech_tools.cli.BatteryClient", FailedClient)
     assert main(["snapshot", "--port", "SYNTHETIC_PORT"]) == 1
     output = capsys.readouterr()
     assert not output.out
@@ -430,7 +430,7 @@ def test_cli_rejects_addressed_full_reports(command):
 
 
 def test_cli_collection_failure_shows_tail_without_serial_trace(monkeypatch, capsys, tmp_path):
-    from batteryview import CollectionResult
+    from pylontech_tools import CollectionResult
 
     class FailedCollection:
         last_failure = CommandTimeout(
@@ -449,7 +449,7 @@ def test_cli_collection_failure_shows_tail_without_serial_trace(monkeypatch, cap
         def collect(self, output, **kwargs):
             return CollectionResult(output, output / "synthetic_manifest.json", False)
 
-    monkeypatch.setattr("batteryview.cli.BatteryClient", FailedCollection)
+    monkeypatch.setattr("pylontech_tools.cli.BatteryClient", FailedCollection)
     assert main(["collect", "--port", "SYNTHETIC_PORT", "--output", str(tmp_path)]) == 1
     captured = capsys.readouterr()
     assert json.loads(captured.out)["complete"] is False
@@ -474,14 +474,16 @@ def test_numbered_connection_does_not_send_numbered_login(monkeypatch):
 
     from conftest import ReplayTransport
 
-    from batteryview.protocol import ConsoleSession
+    from pylontech_tools.protocol import ConsoleSession
 
     transport = ReplayTransport(
         [(b"\n", "pylon_debug>"), (b"info 4\n", INFO), (b"cmdquit\n", "cmdquit")]
     )
-    monkeypatch.setattr("batteryview.client.SerialTransport", lambda *args: transport)
-    monkeypatch.setattr("batteryview.client.ConsoleSession", partial(ConsoleSession, settle_time=0))
-    monkeypatch.setattr("batteryview.protocol.time.sleep", lambda _: None)
+    monkeypatch.setattr("pylontech_tools.client.SerialTransport", lambda *args: transport)
+    monkeypatch.setattr(
+        "pylontech_tools.client.ConsoleSession", partial(ConsoleSession, settle_time=0)
+    )
+    monkeypatch.setattr("pylontech_tools.protocol.time.sleep", lambda _: None)
     with BatteryClient("SYNTHETIC_PORT", module=4, shift=False) as client:
         client.info()
     assert transport.writes == [b"\n", b"info 4\n", b"cmdquit\n"]

@@ -4,7 +4,7 @@ from collections import deque
 
 import pytest
 
-from batteryview.protocol import ConsoleSession
+from pylontech_tools.protocol import ConsoleSession
 
 
 def pytest_addoption(parser):

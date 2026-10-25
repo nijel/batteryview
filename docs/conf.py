@@ -3,9 +3,9 @@
 import os
 from importlib.metadata import version
 
-project = "BatteryView for Python"
-author = "BatteryView contributors"
-release = version("batteryview")
+project = "Pylontech Tools"
+author = "Pylontech Tools contributors"
+release = version("pylontech-tools")
 version = release
 extensions = ["sphinx.ext.autodoc", "sphinxarg.ext", "sphinx_copybutton"]
 autodoc_typehints = "none"

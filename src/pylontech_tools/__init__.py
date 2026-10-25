@@ -4,11 +4,11 @@ import logging
 
 from .client import BatteryClient
 from .errors import (
-    BatteryViewError,
     CommandCancelled,
     CommandTimeout,
     ConnectionError,
     ProtocolError,
+    PylontechError,
     ResetRecoveryError,
     UnsupportedCommand,
 )
@@ -28,7 +28,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     "Alarm",
     "BatteryClient",
-    "BatteryViewError",
+    "PylontechError",
     "CellReading",
     "CollectionResult",
     "CommandTimeout",

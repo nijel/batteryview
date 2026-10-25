@@ -2,8 +2,8 @@ import codecs
 
 import pytest
 
-from batteryview import BatteryClient, CommandTimeout, ConnectionError, ProtocolError
-from batteryview.diagnostics import configure_logging
+from pylontech_tools import BatteryClient, CommandTimeout, ConnectionError, ProtocolError
+from pylontech_tools.diagnostics import configure_logging
 
 
 @pytest.mark.parametrize(
@@ -61,7 +61,7 @@ def test_disconnect_prompt_alone_does_not_acknowledge_cmdquit(replay, monkeypatc
     # Exercise the actual reader with an accelerated monotonic clock. The
     # five-second protocol wait must expire despite receiving a regular prompt.
     tick = iter(range(100))
-    monkeypatch.setattr("batteryview.protocol.time.monotonic", lambda: next(tick))
+    monkeypatch.setattr("pylontech_tools.protocol.time.monotonic", lambda: next(tick))
     with configure_logging(debug=True):
         session.disconnect()
     assert transport.closed
@@ -172,7 +172,7 @@ def test_failed_setup_closes_port_and_preserves_original_error(monkeypatch):
         def close(self):
             raise OSError("close failed")
 
-    monkeypatch.setattr("batteryview.client.SerialTransport", lambda *args: object())
-    monkeypatch.setattr("batteryview.client.ConsoleSession", FailedSession)
+    monkeypatch.setattr("pylontech_tools.client.SerialTransport", lambda *args: object())
+    monkeypatch.setattr("pylontech_tools.client.ConsoleSession", FailedSession)
     with pytest.raises(ProtocolError, match="login failed"):
         BatteryClient("SYNTHETIC_PORT").connect()

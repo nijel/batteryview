@@ -20,7 +20,7 @@ Requires Python 3.11 or newer on Windows, Linux, or macOS:
 .. code:: sh
 
    python -m pip install .
-   batteryview ports
+   pylontech-console ports
 
 Use the battery’s console connection and the appropriate serial cable. The default connection
 sequence sends BatteryView’s mode-switch frame at 1200 baud, then opens the console at 115200
@@ -47,3 +47,16 @@ rejection explicitly even when its echo matches. An echo alone does not confirm 
 mode ended. The disconnect response is excluded from report files. Repeated ``close()`` calls do
 not send additional commands. Failed connection setup releases the port immediately without
 attempting a console command.
+
+Project naming
+--------------
+
+The distribution is ``pylontech-tools``, the import package is ``pylontech_tools``,
+and the command-line entry point is ``pylontech-console``. You can also run
+``python -m pylontech_tools``. The project name leaves room for a future UI.
+
+Earlier checkouts used ``batteryview`` for the package and CLI. Update imports
+and shell commands when upgrading; there is no compatibility alias. The base
+exception is now ``PylontechError``, and logger names start with
+``pylontech_tools``. References to BatteryView in the protocol documentation
+describe the original vendor application.

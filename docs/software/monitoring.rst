@@ -8,10 +8,10 @@ Monitoring
 
 .. code:: sh
 
-   batteryview info --port /dev/ttyUSB0
-   batteryview snapshot --port /dev/ttyUSB0
-   batteryview snapshot --port /dev/ttyUSB0 --format csv --output snapshot.csv
-   batteryview watch --port /dev/ttyUSB0 --interval 5 --count 10 --output readings.jsonl
+   pylontech-console info --port /dev/ttyUSB0
+   pylontech-console snapshot --port /dev/ttyUSB0
+   pylontech-console snapshot --port /dev/ttyUSB0 --format csv --output snapshot.csv
+   pylontech-console watch --port /dev/ttyUSB0 --interval 5 --count 10 --output readings.jsonl
 
 JSON snapshots include timestamps, module/cell readings, alarms, unknown fields, and raw
 responses. CSV has separate ``module`` and ``cell`` rows with explicit units. Missing values are
@@ -41,9 +41,9 @@ Monitoring modes and profiles
 
 .. code:: sh
 
-   batteryview snapshot --port /dev/ttyUSB0 --monitoring-mode single
-   batteryview watch --port /dev/ttyUSB0 --monitoring-mode parallel
-   batteryview snapshot --port /dev/ttyUSB0 --module 3 --profile generic
+   pylontech-console snapshot --port /dev/ttyUSB0 --monitoring-mode single
+   pylontech-console watch --port /dev/ttyUSB0 --monitoring-mode parallel
+   pylontech-console snapshot --port /dev/ttyUSB0 --module 3 --profile generic
 
 ``--monitoring-mode auto`` is the default: read local ``getpwr``, then discover modules with
 ``pwr``. Single mode uses the local reading and optional summary extensions; parallel mode

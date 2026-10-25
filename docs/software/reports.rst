@@ -8,8 +8,8 @@ Pylontech reports
 
 .. code:: sh
 
-   batteryview history --port /dev/ttyUSB0 --output history.txt.txt
-   batteryview event --port /dev/ttyUSB0 --output event.txt.txt
+   pylontech-console history --port /dev/ttyUSB0 --output history.txt.txt
+   pylontech-console event --port /dev/ttyUSB0 --output event.txt.txt
 
 On Windows, use a port such as ``--port COM3``. Full History/Event reports and SOC reset require
 a direct connection and reject ``--module``. Addressed identity and monitoring use explicit

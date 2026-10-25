@@ -9,7 +9,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TextIO
 
-from . import BatteryClient, BatteryViewError, CommandCancelled, Snapshot
+from . import BatteryClient, CommandCancelled, PylontechError, Snapshot
 from .diagnostics import configure_logging, failure_diagnostic
 from .profiles import PROFILES
 from .transport import list_ports
@@ -77,7 +77,7 @@ def parser() -> argparse.ArgumentParser:
         help="write diagnostics to a new UTF-8 file instead of stderr; implies --debug",
     )
     root = argparse.ArgumentParser(
-        prog="batteryview",
+        prog="pylontech-console",
         description="Pylontech console reports and monitoring",
         parents=[diagnostics],
     )
@@ -192,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         ):
             return _run(args)
     except OSError as exc:
-        print(f"batteryview: Cannot configure diagnostic logging: {exc}", file=sys.stderr)
+        print(f"pylontech-console: Cannot configure diagnostic logging: {exc}", file=sys.stderr)
         return 1
 
 
@@ -269,9 +269,9 @@ def _run(args: argparse.Namespace) -> int:
         if detail:
             print(detail, file=sys.stderr)
         return 130
-    except (BatteryViewError, OSError, ValueError) as exc:
+    except (PylontechError, OSError, ValueError) as exc:
         logger.debug("Operation failed command=%s error=%s", args.command, type(exc).__name__)
-        print(f"batteryview: {exc}", file=sys.stderr)
+        print(f"pylontech-console: {exc}", file=sys.stderr)
         detail = failure_diagnostic(exc)
         if detail:
             print(detail, file=sys.stderr)

@@ -8,7 +8,7 @@ Python API
 
 .. code:: python
 
-   from batteryview import BatteryClient
+   from pylontech_tools import BatteryClient
 
    with BatteryClient("/dev/ttyUSB0", module=3) as battery:
        identity = battery.info()
@@ -17,7 +17,7 @@ Python API
 
 The client is synchronous and serializes operations on a shared console session.
 ``watch(interval=5, count=None)`` yields snapshots. ``reset_soc(path)`` is the separate mutating
-workflow. Exceptions derive from ``BatteryViewError``; ``CommandTimeout``,
+workflow. Exceptions derive from ``PylontechError``; ``CommandTimeout``,
 ``UnsupportedCommand``, and ``ProtocolError`` retain any partial response.
 ``ResetRecoveryError`` exposes ``recovery_path``.
 

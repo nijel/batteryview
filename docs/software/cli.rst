@@ -5,6 +5,6 @@ Options below are generated from the application's argument parser. Creating the
 parser does not open a serial port or communicate with a battery.
 
 .. argparse::
-   :module: batteryview.cli
+   :module: pylontech_tools.cli
    :func: parser
-   :prog: batteryview
+   :prog: pylontech-console

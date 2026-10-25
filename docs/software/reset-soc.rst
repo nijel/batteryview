@@ -8,7 +8,7 @@ SOC reset
 
 .. code:: sh
 
-   batteryview reset-soc --port /dev/ttyUSB0 --output reset.txt
+   pylontech-console reset-soc --port /dev/ttyUSB0 --output reset.txt
 
 This command **clears EEPROM, resets the battery, and restores its barcode**, following the
 bundled BatteryView script. Invoke it only when you intend to perform that operation. History,

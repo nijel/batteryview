@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from batteryview import BatteryViewError, CollectionResult, DeviceInfo, ReportResult, Snapshot
-from batteryview.cli import main
-from batteryview.models import CellReading, ModuleReading
+from pylontech_tools import CollectionResult, DeviceInfo, PylontechError, ReportResult, Snapshot
+from pylontech_tools.cli import main
+from pylontech_tools.models import CellReading, ModuleReading
 
 
 class FakeClient:
@@ -64,11 +64,11 @@ class FakeClient:
 def fake_client(monkeypatch):
     FakeClient.failure = None
     FakeClient.collection_complete = True
-    monkeypatch.setattr("batteryview.cli.BatteryClient", FakeClient)
+    monkeypatch.setattr("pylontech_tools.cli.BatteryClient", FakeClient)
 
 
 def test_ports_does_not_connect(monkeypatch, capsys):
-    monkeypatch.setattr("batteryview.cli.list_ports", lambda: [{"port": "COM3"}])
+    monkeypatch.setattr("pylontech_tools.cli.list_ports", lambda: [{"port": "COM3"}])
     assert main(["ports"]) == 0
     assert json.loads(capsys.readouterr().out) == [{"port": "COM3"}]
 
@@ -122,7 +122,7 @@ def test_existing_output_is_not_overwritten(tmp_path, capsys):
 
 
 def test_errors_are_nonzero_and_stderr_only(capsys):
-    FakeClient.failure = BatteryViewError("disconnected")
+    FakeClient.failure = PylontechError("disconnected")
     assert main(["snapshot", "--port", "COM3"]) == 1
     out, err = capsys.readouterr()
     assert not out and "disconnected" in err
@@ -190,11 +190,11 @@ def test_logging_file_is_not_overwritten(tmp_path, capsys):
 
 
 def test_failure_diagnostics_stay_on_stderr(capsys):
-    FakeClient.failure = BatteryViewError("disconnected")
+    FakeClient.failure = PylontechError("disconnected")
     assert main(["--debug", "snapshot", "--port", "COM3"]) == 1
     out, err = capsys.readouterr()
     assert not out
-    assert "Operation failed command=snapshot error=BatteryViewError" in err
+    assert "Operation failed command=snapshot error=PylontechError" in err
 
 
 def test_default_cli_does_not_configure_root_logger(capsys):

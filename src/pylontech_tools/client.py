@@ -14,10 +14,10 @@ from pathlib import Path
 from .collection import collect
 from .diagnostics import command_label
 from .errors import (
-    BatteryViewError,
     CommandTimeout,
     ConnectionError,
     ProtocolError,
+    PylontechError,
     ResetRecoveryError,
     UnsupportedCommand,
 )
@@ -101,7 +101,7 @@ class BatteryClient:
         except BaseException:
             try:
                 session.close()
-            except (BatteryViewError, OSError) as exc:
+            except (PylontechError, OSError) as exc:
                 logger.debug("Setup cleanup failed error=%s", type(exc).__name__)
             raise
         self._session = session

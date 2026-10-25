@@ -8,7 +8,7 @@ from pathlib import Path
 # Below DEBUG so configuring ordinary library debug logging never enables raw I/O.
 SERIAL_TRACE = 5
 logging.addLevelName(SERIAL_TRACE, "TRACE")
-serial_logger = logging.getLogger("batteryview.serial")
+serial_logger = logging.getLogger("pylontech_tools.serial")
 
 
 def command_label(command: str) -> str:
@@ -56,7 +56,7 @@ def configure_logging(
     if not (debug or trace_serial or log_file):
         yield
         return
-    logger = logging.getLogger("batteryview")
+    logger = logging.getLogger("pylontech_tools")
     previous = logger.level, logger.propagate, logger.handlers[:], serial_logger.level
     handler = (
         logging.FileHandler(log_file, mode="x", encoding="utf-8")

@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 from conftest import ScriptedSession
 
-from batteryview import BatteryClient, CommandTimeout, ProtocolError, ResetRecoveryError
-from batteryview.protocol import CONTINUATION, Response
-from batteryview.transcript import TranscriptWriter, report_filename
+from pylontech_tools import BatteryClient, CommandTimeout, ProtocolError, ResetRecoveryError
+from pylontech_tools.protocol import CONTINUATION, Response
+from pylontech_tools.transcript import TranscriptWriter, report_filename
 
 INFO = (
     "info\n\r@\r\n\rDevice address      : 1\r\n\rDevice name         : SYNTHETIC_MODEL"
@@ -278,7 +278,7 @@ def _check_private_recording(tmp_path, replay, kind, fixtures):
         client = BatteryClient(session=session)
         method = client.export_history if kind == "history" else client.export_events
         if kind == "history":
-            from batteryview.parsers import record_indices
+            from pylontech_tools.parsers import record_indices
 
             latest = record_indices(frames[2], detailed=True)
             expected_count = latest[-1] + 1

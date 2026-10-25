@@ -1,71 +1,71 @@
 Python API reference
 ====================
 
-Use :class:`batteryview.BatteryClient` as a context manager to connect and close
+Use :class:`pylontech_tools.BatteryClient` as a context manager to connect and close
 the console. See :doc:`python` for examples. Measurements use the units in field
 names; absent measurements are ``None``. Results retain raw console data.
 
-.. autoclass:: batteryview.Alarm
+.. autoclass:: pylontech_tools.Alarm
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.BatteryClient
+.. autoclass:: pylontech_tools.BatteryClient
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.BatteryViewError
+.. autoclass:: pylontech_tools.PylontechError
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.CellReading
+.. autoclass:: pylontech_tools.CellReading
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.CollectionResult
+.. autoclass:: pylontech_tools.CollectionResult
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.CommandTimeout
+.. autoclass:: pylontech_tools.CommandTimeout
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.CommandCancelled
+.. autoclass:: pylontech_tools.CommandCancelled
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.ConnectionError
+.. autoclass:: pylontech_tools.ConnectionError
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.DeviceInfo
+.. autoclass:: pylontech_tools.DeviceInfo
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.ModuleReading
+.. autoclass:: pylontech_tools.ModuleReading
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.ProtocolError
+.. autoclass:: pylontech_tools.ProtocolError
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.ReportResult
+.. autoclass:: pylontech_tools.ReportResult
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.ResetRecoveryError
+.. autoclass:: pylontech_tools.ResetRecoveryError
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.Snapshot
+.. autoclass:: pylontech_tools.Snapshot
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.SystemReading
+.. autoclass:: pylontech_tools.SystemReading
    :members:
    :undoc-members:
 
-.. autoclass:: batteryview.UnsupportedCommand
+.. autoclass:: pylontech_tools.UnsupportedCommand
    :members:
    :undoc-members:
 

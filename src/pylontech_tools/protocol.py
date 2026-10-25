@@ -10,11 +10,11 @@ from typing import Literal
 
 from .diagnostics import SERIAL_TRACE, command_label, serial_logger
 from .errors import (
-    BatteryViewError,
     CommandCancelled,
     CommandTimeout,
     ConnectionError,
     ProtocolError,
+    PylontechError,
     UnsupportedCommand,
 )
 from .transport import Transport
@@ -322,7 +322,7 @@ class ConsoleSession:
                         len(response.text),
                         time.monotonic() - started,
                     )
-            except (BatteryViewError, OSError) as exc:
+            except (PylontechError, OSError) as exc:
                 logger.debug(
                     "Disconnect failed error=%s elapsed=%.3fs; closing port anyway",
                     type(exc).__name__,
@@ -331,7 +331,7 @@ class ConsoleSession:
             finally:
                 try:
                     self.close()
-                except (BatteryViewError, OSError) as exc:
+                except (PylontechError, OSError) as exc:
                     logger.debug("Port close failed error=%s", type(exc).__name__)
 
     def close(self) -> None:

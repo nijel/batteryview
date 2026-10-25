@@ -8,7 +8,7 @@ Support collection for several modules
 
 .. code:: sh
 
-   batteryview collect --port /dev/ttyUSB0 --output support/
+   pylontech-console collect --port /dev/ttyUSB0 --output support/
 
 This collects **identity → History → Event → snapshot** using one connection. Connect the
 console cable to each module separately and repeat the same command with the same output
