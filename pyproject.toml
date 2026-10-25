@@ -11,9 +11,6 @@ requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 dependencies = ["pyserial>=3.5,<4"]
 
-[project.optional-dependencies]
-test = ["pytest>=8", "ruff>=0.11"]
-
 [project.scripts]
 pylontech-console = "pylontech_tools.cli:main"
 
@@ -52,6 +49,7 @@ line-length = 100
 select = ["E4", "E7", "E9", "F", "I"]
 
 [dependency-groups]
+dev = ["pytest>=8", "ruff>=0.11"]
 docs = [
     "furo==2025.12.19",
     "sphinx==9.2.0",

@@ -8,10 +8,10 @@ Development and validation
 
 .. code:: sh
 
-   python -m pip install -e '.[test]'
-   python -m pytest -q
-   python -m ruff check .
-   python -m ruff format --check .
+   uv sync --frozen
+   uv run --frozen python -m pytest -q
+   uv run --frozen python -m ruff check .
+   uv run --frozen python -m ruff format --check .
 
 All distributed test data is synthetic: invented identities, timestamps, counts, and
 measurements. Private files in ``Logs/``, the vendor bundle, and editor recovery files are
@@ -22,7 +22,7 @@ Local comparison with the three original recordings is opt-in:
 
 .. code:: sh
 
-   python -m pytest -q --private-logs=Logs
+   uv run --frozen python -m pytest -q --private-logs=Logs
 
 These tests read recordings at runtime without copying them into public fixtures. Complete
 references are compared byte-for-byte. The historical History capture contains missing records:
