@@ -54,7 +54,10 @@ select = ["E4", "E7", "E9", "F", "I"]
 [dependency-groups]
 docs = [
     "furo==2025.12.19",
-    "sphinx==8.2.3",
+    "sphinx==9.2.0",
     "sphinx-argparse==0.6.1",
     "sphinx-copybutton==0.5.2",
 ]
+
+[tool.uv.dependency-groups]
+docs = { requires-python = ">=3.13" }

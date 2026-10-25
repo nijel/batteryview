@@ -7,6 +7,8 @@ from typing import Any
 
 @dataclass(frozen=True)
 class DeviceInfo:
+    """Device identity and firmware fields returned by the console."""
+
     address: int | None = None
     name: str | None = None
     barcode: str | None = None
@@ -16,6 +18,8 @@ class DeviceInfo:
 
 @dataclass(frozen=True)
 class Alarm:
+    """An alarm code and its source, severity, and optional cell index."""
+
     source: str
     code: str
     severity: str
@@ -24,6 +28,8 @@ class Alarm:
 
 @dataclass(frozen=True)
 class CellReading:
+    """Normalized measurements and states for one cell."""
+
     index: int
     voltage_v: float | None = None
     current_a: float | None = None
@@ -35,6 +41,8 @@ class CellReading:
 
 @dataclass(frozen=True)
 class ModuleReading:
+    """Normalized module measurements, cell readings, and alarms."""
+
     address: int | None = None
     voltage_v: float | None = None
     current_a: float | None = None
@@ -61,6 +69,8 @@ class ModuleReading:
 
 @dataclass(frozen=True)
 class SystemReading:
+    """Measurements and current recommendations for the battery system."""
+
     current_a: float | None = None
     voltage_v: float | None = None
     recommended_charge_a: float | None = None
@@ -69,6 +79,8 @@ class SystemReading:
 
 @dataclass(frozen=True)
 class Snapshot:
+    """A timestamped set of module readings and raw console responses."""
+
     timestamp: str
     modules: list[ModuleReading]
     raw_responses: dict[str, str] = field(default_factory=dict)
@@ -80,6 +92,8 @@ class Snapshot:
 
 @dataclass(frozen=True)
 class ReportResult:
+    """An exported transcript, its record count, and recovery information."""
+
     path: Path
     kind: str
     records: int | None
@@ -90,6 +104,8 @@ class ReportResult:
 
 @dataclass(frozen=True)
 class CollectionResult:
+    """Support collection paths and whether all collection steps completed."""
+
     directory: Path
     manifest_path: Path
     complete: bool

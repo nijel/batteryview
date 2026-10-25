@@ -49,6 +49,9 @@ scripts are outside this first implementation.
 Building the documentation
 --------------------------
 
+Documentation builds require Python 3.13 or newer (the library supports Python 3.11+).
+Read the Docs builds on Ubuntu 26.04 with Python 3.14.
+
 Install the pinned documentation dependencies and build HTML with warnings treated
 as errors. The same command runs in CI; Read the Docs uses the frozen lockfile.
 
