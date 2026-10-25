@@ -17,6 +17,8 @@ remote table entry: command name, exact firmware help, maximum token count,
 required access mask, handler address and table-record offset, plus decoded
 selector tables for config/prot/ctrl/datalist. The firmware
 hashes distinguish these observations from guesses based on another revision.
+The [parameter and effects reference](firmware-parameters.md) documents handler-derived
+argument bases, ranges, defaults, storage effects and unresolved contracts.
 [Reset analysis](protocol.md#firmware-evidence-for-soc-reset) provides the deeper
 EEPROM and restart findings.
 
@@ -91,23 +93,23 @@ acronyms and undocumented argument meanings are left unresolved.
 | `login <mode>` | Enter config, equipment or debug mode from user mode. | L/R:U | L/R:U | V |
 | `logout` | Return to user mode. | L/R:U | L/R:U | V |
 | `ci` | Show current communications information. | L:D | L:D | H |
-| `ct <port>` | Enable communication-port data tracing; stop behavior needs review. | L:D | L:D | H |
-| `lg <cstm\|sys> <en\|dis>` | Control LG customer/system compatibility state. | L:D | L:D | H |
-| `setprt <sma\|lg>` | Select the inverter communication protocol. | L:C | L:C | H |
-| `urates <500000\|115200\|9600>` | Set the RS485 port rate; this is not the console baud setting. | L:C | L:C | H |
+| `ct <port>` | Dump a buffered protocol frame for decimal port 0 or 1. | L:D | L:D | V |
+| `lg <cstm\|sys> <en\|dis>` | Control LG customer/system compatibility state. | L:D | L:D | V |
+| `setprt <sma\|lg>` | Select the inverter communication protocol. | L:C | L:C | V |
+| `urates <500000\|115200\|9600>` | Set the RS485 port rate; this is not the console baud setting. | L:C | L:C | V |
 
 ### Identity, measurements and status
 
 | Command / compact syntax | Purpose | E2 | C | Evidence |
 | --- | --- | --- | --- | --- |
 | `info` | Show identity, firmware, barcode and module specification. | L/R:U | L/R:U | H |
-| `bmicrdcfg <total-ic>` | Read battery-monitor IC configuration for the requested IC count. | L:D | L:D | H |
-| `bmicrdcomm <total-ic>` | Read battery-monitor IC communication data for the requested IC count. | L:D | L:D | H |
-| `bat [pwr] [index]` | Show battery/cell readings; exact selection defaults are handler-specific. | L:U | L:U | H |
-| `pwr [index]` | Show module power summaries, including absent rack slots. | L:U | L:U | H |
+| `bmicrdcfg <total-ic>` | Read battery-monitor IC configuration for the requested IC count. | L:D | L:D | V |
+| `bmicrdcomm <total-ic>` | Read battery-monitor IC communication data for the requested IC count. | L:D | L:D | V |
+| `bat [pwr] [index]` | Show battery/cell readings; exact selection defaults are handler-specific. | L:U | L:U | V |
+| `pwr [index]` | Show module power summaries, including absent rack slots. | L:U | L:U | V |
 | `getpwr [index]` | Show detailed module/cell readings in hash-delimited form; checks optional module selection. | L:U | L:U | V |
-| `pwrsys [argument]` | Show power-system status; table permits one argument that help does not explain. | L:E | L:E | H |
-| `soh [addr]` | Show state of health; remote-only in E2, local and remote in C. | R:U | L/R:U | H |
+| `pwrsys [argument]` | Show power-system status; table permits one argument that help does not explain. | L:E | L:E | V |
+| `soh [addr]` | Show state of health; remote-only in E2, local and remote in C. | R:U | L/R:U | V |
 | `tsoh` | SOH test/report routine; C image only, not established as a pure read. | — | L:E | H |
 | `disp [selection...]` | Configure periodic display of module/cell quantities. | L:U | L:U | H |
 | `euro [arguments...]` | Euro status-list display; argument fields are not described by help. | L:U | L:U | H |
@@ -119,31 +121,31 @@ acronyms and undocumented argument meanings are left unresolved.
 | --- | --- | --- | --- | --- |
 | `stat` | Show record counts, SOC/coulomb fields and operating/fault counters. | L/R:U | L/R:U | V |
 | `statc` | Clear most runtime statistics, preserving selected counters; invokes a state callback. Not EEPROM erase. | L/R:C | L/R:C | V |
-| `data <kind> [item]` | Show a recorded item; the no-item/default path is handler-dependent. | L/R:U | L/R:U | H |
+| `data <kind> [item]` | Show a recorded item; the no-item/default path is handler-dependent. | L/R:U | L/R:U | V |
 | `datalist <kind> [selection...]` | List recorded data; handler also supports the unadvertised dtls form. | L:U | L:U | V |
 | `datac <event\|history\|event_log\|use>` | Clear selected recorded-data bookkeeping/storage; exact scope varies by kind. | L:C | L:C | H |
 | `save <event\|history>` | Request an event/history record to be saved. | L:D | L:D | H |
-| `log [data]` | Show internal diagnostic log information. | L:U | L:U | H |
+| `log [data]` | Show internal diagnostic log information. | L:U | L:U | V |
 | `logc` | Clear internal log count/wrap bookkeeping; E2 writes chip-0 offset 0x387. | L:C | L:C | V |
-| `logt <data>` | Generate test log data. | L:D | L:D | H |
+| `logt <data>` | Generate test log data. | L:D | L:D | V |
 | `tclear` | Test routine for clearing on-chip records; exact scope needs review. | L:E | L:E | H |
-| `tcycle <cycle-times>` | Set/test the cycle-count value; do not treat as a read. | L:D | L:D | H |
+| `tcycle [cycle-times]` | Set/test the cycle-count value; do not treat as a read. | L:D | L:D | V |
 
 ### Configuration, protection and SOC
 
 | Command / compact syntax | Purpose | E2 | C | Evidence |
 | --- | --- | --- | --- | --- |
-| `config [key] [values...]` | Read/change protection and scheduling parameters; includes save/default actions. | L/R:C | L/R:C | H |
-| `prot [key] [en\|dis]` | Read/change protection enablement; includes default and smart-charge controls. | L/R:C | L/R:C | H |
+| `config [key] [values...]` | Read/change protection and scheduling parameters; includes save/default actions. | L/R:C | L/R:C | V |
+| `prot [key] [en\|dis]` | Read/change protection enablement; includes default and smart-charge controls. | L/R:C | L/R:C | V |
 | `ctrl [target] [value]` | Read/control FETs, outputs and test flags; handler supports more targets than help lists. | L/R:C | L/R:C | V |
 | `couls [iah\|vah\|asic\|default]` | Select/report coulomb calculation mode; registered only in the remote table. | R:D | R:D | H |
-| `autoswitch [1\|0]` | Read/control automatic-switching enablement. | L:D | L:D | H |
+| `autoswitch [1\|0]` | Read/control automatic-switching enablement. | L:D | L:D | V |
 | `setlowcfg [save\|shutsoc\|sstime] [num]` | Read/set low-SOC shutdown settings; E2 save path reports unsupported. | L:D | L:D | V |
 | `setsoc <0..100>` | Set per-cell runtime remaining charge/SOC; distinct from BatteryView SOC reset. | L:C | L:C | V |
-| `emptyvolt <val>` | Set empty-voltage threshold; units/range require handler confirmation. | L/R:C | L/R:C | H |
-| `blocksoc <val>` | Set block-SOC parameter; C only, units/range not established. | — | L:C | H |
+| `emptyvolt [val]` | Read/set empty-voltage threshold; E2 accepts 500–3300 after u16 conversion. | L/R:C | L/R:C | V |
+| `blocksoc [val]` | Read/set block-current SOC percentage; C accepts 1–100. | — | L:C | V |
 | `totalcoul [val]` | Read/set configured nominal capacity; E2 accepts 50, 74 or 100 Ah and stores chip-1 data. | L:C | L:C | V |
-| `time [yy MM dd hh mm ss]` | Read/set battery RTC; six date/time values when setting. | L:U | L:U | H |
+| `time [yy MM dd hh mm ss]` | Read/set battery RTC; six date/time values when setting. | L:U | L:U | V |
 | `cmudtesttime [year month day hour minute second]` | Device-test timestamp command; exact read/write behavior needs review. | L:U | L:U | H |
 
 ### EEPROM, external flash and memory
@@ -151,31 +153,31 @@ acronyms and undocumented argument meanings are left unresolved.
 | Command / compact syntax | Purpose | E2 | C | Evidence |
 | --- | --- | --- | --- | --- |
 | `eepe <chip>` | Overwrite the selected logical EEPROM with zeros: 2048 bytes in both images. | L:D | L:D | V |
-| `eepr <chip> <offset> <size>` | Read EEPROM bytes. | L:D | L:D | H |
-| `eepw <chip> <offset> <value> <size>` | Write EEPROM data. | L:D | L:D | H |
-| `flae <chip>` | Erase selected external flash; not the same storage operation as eepe. | L:D | L:D | H |
-| `flar <chip> <offset> <size>` | Read external flash. | L:D | L:D | H |
-| `flaw <chip> <offset> <value>` | Write external flash. | L:D | L:D | H |
-| `md <width> <address> <size>` | Dump MCU address-space contents, potentially including peripheral registers. | L:D | L:D | H |
-| `mm <width> <address> <value>` | Write MCU address-space contents, potentially including peripheral registers. | L:D | L:D | H |
+| `eepr <chip> <offset> <size>` | Read bytes: decimal chip/count, hexadecimal offset. | L:D | L:D | V |
+| `eepw <chip> <offset> <value> [repeat]` | Repeat a byte; offset, value and optional repeat are hexadecimal. | L:D | L:D | V |
+| `flae <chip>` | Erase selected external flash; not the same storage operation as eepe. | L:D | L:D | V |
+| `flar <chip> <offset> <size>` | Read external flash. | L:D | L:D | V |
+| `flaw <chip> <offset> <value>` | Write external flash. | L:D | L:D | V |
+| `md <width> <address> <size>` | Dump MCU address-space contents, potentially including peripheral registers. | L:D | L:D | V |
+| `mm <width> <address> <value>` | Write MCU address-space contents, potentially including peripheral registers. | L:D | L:D | V |
 
 ### Fuel-gauge registers and calibration
 
 | Command / compact syntax | Purpose | E2 | C | Evidence |
 | --- | --- | --- | --- | --- |
-| `inar <offset>` | Read INA226 register; actual name differs from socr in its help. | L:D | — | H |
-| `inaw <offset> <value>` | Write INA226 register; help calls this socw. | L:D | — | H |
-| `inash` | Show INA226 registers; help calls this socsh. | L:D | — | H |
-| `inacal <arguments...>` | INA226 current-calibration handler; help incorrectly names currcal and omits a possible argument. | L:D | — | H |
-| `currcal <value>` | Separate current-calibration handler; do not alias to inacal. | L:D | — | H |
-| `socr <offset>` | Read C-image fuel-gauge register. | — | L:D | H |
-| `socw <offset> <value>` | Write C-image fuel-gauge register. | — | L:D | H |
-| `socsh` | Show C-image fuel-gauge registers. | — | L:D | H |
-| `soccfg <subclass> <offset> <value>` | Write fuel-gauge subclass/data configuration. | — | L:D | H |
+| `inar <offset>` | Read INA226 register; actual name differs from socr in its help. | L:D | — | V |
+| `inaw <offset> <value>` | Write INA226 register; help calls this socw. | L:D | — | V |
+| `inash` | Show INA226 registers; help calls this socsh. | L:D | — | V |
+| `inacal <arguments...>` | INA226 current-calibration handler; help incorrectly names currcal and omits a possible argument. | L:D | — | V |
+| `currcal [value]` | Separate current-calibration handler; do not alias to inacal. | L:D | — | V |
+| `socr <offset>` | Read C-image fuel-gauge register. | — | L:D | V |
+| `socw <offset> <value>` | Write C-image fuel-gauge register. | — | L:D | V |
+| `socsh` | Show C-image fuel-gauge registers. | — | L:D | V |
+| `soccfg <subclass> <offset> <value>` | Write fuel-gauge subclass/data configuration. | — | L:D | V |
 | `soccal <quantity> <value>` | Calibrate voltage/current/temperature or current-counter/board offsets. | — | L:D | H |
-| `socd [arguments...]` | Show fuel-gauge data; table permits two arguments absent from help. | — | L:D | H |
-| `socclr [argument]` | Clear bq34z100 data flash and reload defaults according to help; separate from eepe. | — | L:C | H |
-| `soct [arguments...]` | Show fuel-gauge Ra table; table permits two arguments absent from help. | — | L:D | H |
+| `socd [arguments...]` | Show fuel-gauge data; table permits two arguments absent from help. | — | L:D | V |
+| `socclr [argument]` | Clear bq34z100 data flash and reload defaults according to help; separate from eepe. | — | L:C | V |
+| `soct [arguments...]` | Show fuel-gauge Ra table; table permits two arguments absent from help. | — | L:D | V |
 | `tsoc` | Run bq34z100 test routine; not established as read-only. | — | L:E | H |
 
 ### Reset, power control and firmware transfer
@@ -183,7 +185,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | Command / compact syntax | Purpose | E2 | C | Evidence |
 | --- | --- | --- | --- | --- |
 | `trst` | Soft system reset; E2 ultimately requests Cortex-M SYSRESETREQ. | L:U | L:U | V |
-| `shut` | Request shutdown; confirmation/repetition behavior must follow the handler. | L:U | L:U | H |
+| `shut` | Request shutdown; confirmation/repetition behavior must follow the handler. | L:U | L:U | V |
 | `tsoftdsg` | Run soft-discharge test routine; distinct from ordinary status reads. | L:D | L:D | H |
 | `updata` | Enter firmware update workflow; subsequent transfer is a separate protocol. | L:U | L:U | H |
 
@@ -193,24 +195,24 @@ acronyms and undocumented argument meanings are left unresolved.
 | --- | --- | --- | --- | --- |
 | `tbar <barcode>` | Validate/write barcode; E2 requires 16 alphanumeric characters and checks selected cell-count cases. | L:E | L:E | V |
 | `tbuz` | Run buzzer test. | L:E | L:E | H |
-| `tchgc <current> [limit]` | Charge-current test; E2 and C argument limits differ. | L:E | L:E | H |
-| `tdisc <current> [limit]` | Discharge-current test; E2 and C argument limits differ. | L:E | L:E | H |
-| `tvolt [value]` | Cell/battery voltage test; value semantics not described by help. | L:E | L:E | H |
+| `tchgc [current [limit]]` | Charge-current test; E2 and C argument limits differ. | L:E | L:E | V |
+| `tdisc [current [limit]]` | Discharge-current test; E2 and C argument limits differ. | L:E | L:E | V |
+| `tvolt [value]` | Cell voltage test; E2 optional value is allowed spread in mV. | L:E | L:E | V |
 | `tpwr` | Test total module voltage; C only. | — | L:E | H |
-| `ttmp [value]` | Battery temperature test; value semantics need review. | L:E | L:E | H |
+| `ttmp [value]` | Cell temperature test; E2 optional value is allowed spread in mC. | L:E | L:E | V |
 | `tetmp` | Environment-temperature test. | L:E | L:E | H |
-| `tinput <rv\|dcov\|absent\|present>` | Test or simulate input state; do not assume a passive read. | L:E | L:E | H |
+| `tinput <rv\|dcov\|absent\|present>` | Test selected input condition; present/absent branches invoke hardware callbacks. | L:E | L:E | V |
 | `tmos <cfet\|dfet>` | Test selected MOSFET. | L:E | L:E | H |
 | `teepr` | EEPROM write/read test; E2 temporarily writes 0x55 at offset 0x26 on both chips, then restores it. | L:E | L:E | V |
 | `tflash` | External-flash test; exact modifications need review. | L:E | L:E | H |
 | `ti2c` | Run I2C test routine. | L:E | L:E | H |
 | `tcan` | Run CAN test; help advertises port# but table rejects additional tokens. | L:E | L:E | H |
 | `tusart` | Run USART test routine. | L:E | L:E | H |
-| `tdip [flag]` | Test DIP-switch state; flag behavior needs review. | L:E | L:E | H |
+| `tdip <expected>` | Compare DIP-switch state with a decimal value 0–15. | L:E | L:E | V |
 | `tled <selector> [on\|off]` | Test/control LEDs using selector 0, LED number or on/off per help. | L:E | L:E | H |
 | `tibcio <nc\|sc>` | Test IBC I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | H |
 | `tcbnio <nc\|sc>` | Test CBN I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | H |
-| `tmprctrl <flag> [bat-id value]` | Control/simulate battery temperature by flag or indexed value. | L:D | L:D | H |
+| `tmprctrl <flag> [bat-id value]` | Inject runtime temperature or voltage by flag and selector; short form restores measurement flags. | L:D | L:D | V |
 | `tsto` | Test self-test output; C only. | — | L:E | H |
 | `tver <version>` | Test/set software-version test value; C only, exact scope needs review. | — | L:E | H |
 | `tdct` | Run dry-contact test. | L:E | L:E | H |
@@ -299,7 +301,9 @@ softtime mot motr cocp docp ocpd
 ```
 
 The final six names above are present in the selector table but omitted from
-help. Exact selector order and source addresses are retained in the JSON.
+help. In E2, `softtime`, `cocp`, `docp` and `ocpd` dispatch directly to a successful
+exit without implementing a setting. Recognized names do not guarantee effects.
+Exact selector order and source addresses are retained in the JSON.
 
 The advertised scheduling forms are `[sleep/record] [on/off/day/week/month]
 [starttime] [endtime]` and `hwsleep [on/off] [sleeptime] [wakeuptime]`.
@@ -393,7 +397,9 @@ mentioned. Shared names/help do not establish identical hardware effects.
 
 ## Remaining work before implementation
 
-Use the recorded handler addresses to establish parameter units, numeric bases,
+The [parameter reference](firmware-parameters.md) records the completed handler
+analysis and names the remaining gaps. Use the recorded handler addresses to
+establish unresolved parameter units, numeric bases,
 full accepted forms, persistence timing and per-model hardware behavior for each
 new write/test command. Identify operation-specific result messages and recovery
 requirements, then test with synthetic replies before live verification. This

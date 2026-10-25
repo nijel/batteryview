@@ -323,7 +323,9 @@ framing details, and remaining hardware acceptance checks. The
 [firmware command reference](docs/firmware-commands.md) catalogs all registered
 console commands in the two reviewed firmware images, including access modes,
 model differences and confirmed effects. Exact extracted metadata is available
-in [JSON](docs/firmware-commands.json).
+in [JSON](docs/firmware-commands.json). The [parameter reference](docs/firmware-parameters.md)
+adds accepted forms, numeric bases, ranges, defaults, storage effects and known
+firmware validation bugs, with explicit gaps where analysis is incomplete.
 
 GUI, TCP adapters, XLSX exports, parameter editing, firmware updating, and
 arbitrary service scripts are outside this first implementation.
