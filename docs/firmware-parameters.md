@@ -226,7 +226,7 @@ it is not a harmless report with an optional numeric filter.
 | `socr offset` | H offset **00–7F**; reads **one byte**, unlike E2 `inar`. |
 | `socw offset value` | H offset **00–7E**; H value → u8; writes **one byte**. |
 | `socsh` | No operands; fuel-gauge register report. |
-| `socd` | Reads gauge data including pack voltage, signed current, SOC and remaining capacity. The table permits two extra tokens, but the inspected handler does not consume them. Current/capacity scaling uses a runtime factor. |
+| `socd` | Reads gauge data including pack voltage, signed current, SOC and remaining capacity. The table permits two extra tokens, but the inspected handler does not consume them. The reviewed C initializer sets the current/capacity factor to **4**; register decoding and read-error limitations are in the supplement. |
 | `soct` | Reads chemistry ID and Ra/resistance-table information, including flags and table entries. Permitted extra tokens are not consumed by this handler. |
 | `soccfg` | Lists named data-flash fields, subclass, offset and decoded value using a descriptor table. |
 | `soccfg subclass offset [value]` | Subclass and offset are **D**, narrowed to u16 and matched to descriptor fields. A matching descriptor controls width and signed/unsigned/other value encoding. This is **not** a generic arbitrary-width raw-memory write. All eight encodings, the 38 supported pairs, and the faulty sentinel/parser validation are documented in the supplement. |
@@ -389,7 +389,7 @@ other action strings are rejected except on the numeric PWM paths.
 | `i2c` | Bare target **clears bit 0 of I2C1 control register at 0x40005400**, disabling the peripheral; it is **not a status query**. The `on`/`off` forms do not reach that call. Helper `0x0802b958` has no restore step. |
 | `afuse` | Passes inverse on/off state to module callback operation `0x29`, then reports the cached AFUSE flag. The handler prints `Nonsupport currlimit mode` as well; persistent EEPROM markers/GPIO effects are now traced in the supplement; the physical circuit action remains board-specific. Bare target follows the same default-zero action path rather than a pure query. |
 | `agelog` | Query reads EEPROM 0 `0x7b7`; marker `0x5a` enables the cached flag. Setter persists `0x5a` for on, zero for off. |
-| `mostest` | Query reads EEPROM 0 `0x7f4` and EEPROM 1 `0x2a`; either `0x5a` marker enables the cached flag. Setter writes both locations with `0x5a` or zero. Actual MOS-test consumer behavior remains unverified. |
+| `mostest` | Query reads EEPROM 0 `0x7f4` and EEPROM 1 `0x2a`; either `0x5a` marker enables the cached flag. Setter writes both locations with `0x5a` or zero. The flag gates active background fault checks that can invoke AFUSE, record an event and persist state; see the supplement for thresholds and conditions. |
 
 These observations are specific to E2 `0x08029500`–`0x08029bcc`. Display labels
 such as `CFETFLAG`, `DFETFLAG` and `dryct1`–`dryct4` are not additional selectors.
@@ -417,7 +417,7 @@ of the standard console footer.
 | --- | --- |
 | `tbar barcode` | Exactly **16 alphanumeric characters**. Fourth character `1` requires 15 cells; `4` requires 16. Other fourth characters skip those particular checks. Writes 16 bytes at EEPROM 0 `0x21`, reads back and compares. Inspect the test result, not just the footer. |
 | `tdip expected` | D **0–15**, required. Reads four active-low GPIO bits and compares the assembled DIP value with the expected value. Does not set DIP switches. Mismatch can still return zero. |
-| `tinput {rv\|dcov\|present\|absent}` | Compares hardware input against the selected condition. The present/absent paths bracket the read with module callbacks and a delay; this is not established as a purely passive read or a forced input simulation. |
+| `tinput {rv\|dcov\|present\|absent}` | Compares hardware input against the selected condition. The present/absent paths clear two GPIO outputs, delay/sample, then force one output high and reset a counter; they do not restore saved levels. See the supplement for callback/pin evidence. |
 | `tchgc [current [limit]]` | Both D, mA. No operands uses **10000 ± 50 mA**. One operand uses supplied current ±50. Two use supplied current ±limit, with **limit 50–500 inclusive**. Requires charging state; otherwise prints `not chg`. |
 | `tdisc [magnitude [limit]]` | Both D, mA; supplied magnitude is **negated internally**. No operands uses **−1000 ±100 mA**; one uses negative supplied magnitude ±100. Explicit limit must be **100–500 inclusive**. Requires discharge state; otherwise prints `not dsg`. |
 | `tvolt [spread]` | Optional D **maximum cell-voltage spread in mV**, not a target voltage. Compares max-minus-min with supplied spread, prints cell values/difference. Also checks sampling stability and can report `Batt Volt data instability`. |
@@ -450,12 +450,12 @@ selector is D and value is S:
 | `0 .. cell-count-1` | Writes that cell's temperature field. |
 | `99` | Writes the module environment-temperature field. |
 | `98` | Writes another module temperature field; physical sensor mapping unverified. |
-| `97` | Enables an additional simulated-temperature field; consumer mapping unverified. |
+| `97` | Overrides a monitor auxiliary-ADC diagnostic; feeds a monitor-reference diagnostic with a 2980–3020 acceptance window and fault counter, rather than ordinary thermometry; see the supplement. |
 | `100 .. 100+cell-count-1` | Subtracts 100 and writes that cell's **voltage** field. |
 
 Temperature-path values are accepted from **−40000 through 100000 inclusive**
-(raw mC fields). The voltage path checks signed value `< 5001` but lacks an
-explicit nonnegative check; a client should reject negative voltage. These are
+(mC for thermometry; selector 97 reuses this bound for a different diagnostic). The voltage path checks signed value `< 5001` but lacks an explicit
+nonnegative check; a client should reject negative voltage. These are
 runtime injected readings/flags, not temperature calibration EEPROM writes.
 
 ### Other parameterized handlers: remaining limits
@@ -463,8 +463,8 @@ runtime injected readings/flags, not temperature calibration EEPROM writes.
 | Command | Known form and unresolved details |
 | --- | --- |
 | `bmicrdcfg total-ic`, `bmicrdcomm total-ic` | Required **D** IC-count operand. E2 `bmicrdcfg` rejects zero; `bmicrdcomm` has no corresponding zero check. Both pass a u8 count after setup; no upper bound is enforced. The reader copies eight bytes per IC into the command’s 16-byte buffer: **count >=3 overflows it**. Restrict to the actual board count and at most two; details in supplement. |
-| `disp ...` | Repeated-display selections include `pwrs`, `bats`, `volt`, `curr`, `temp`; numeric selectors/intervals exist. Complete selection forms and `disp 0` stop behavior are in the supplement; a positive scalar writes fields not consulted by the reviewed display consumer, so time units are not assumed. |
-| `euro ...`, `eurostub ...` | Report/clear and init/off/three-number injection forms, slot bounds and the non-master Euro pointer bug are in the supplement. |
+| `disp ...` | Repeated-display selections include `pwrs`, `bats`, `volt`, `curr`, `temp`; numeric selection and scalar forms exist. Complete selection forms and `disp 0` stop behavior are in the supplement; a positive scalar writes fields not consulted by the reviewed display consumer, so time units are not assumed. |
+| `euro ...`, `eurostub ...` | Report/clear and init/off/three-number injection forms, all eight slot meanings/units and the non-master Euro pointer bug are in the supplement. |
 | `tled selector [on\|off]` | `tled`, `tled on|off`, `tled 1..8 on|off` and `tled 0` are traced in the supplement, including persistent test-mode flag behavior. |
 | `tmos {cfet\|dfet}` | Selects FET test; initial-current bounds, clear/set sequence, delays and forced restoration level are in the supplement. External fixture requirements remain board-specific. |
 | `tibcio {nc\|sc}`, `tcbnio {nc\|sc}` | Passive logical-input comparisons: nc expects 1, sc expects 0; tested SLAVED/HOSTED/DCIN signals and status handling are in the supplement. |

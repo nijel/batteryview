@@ -432,9 +432,28 @@ state. Other forms (`0x08019686` onward):
 
 The handler does not verify the full required operand count before loading all
 three numeric operands and does not consistently inspect conversion errors.
-The eight slot consumer meanings are not named by this handler; do not present
-these indices as calibrated engineering quantities without tracing their
-consumers. These are injection controls, not ordinary report filters.
+The E2 consumers resolve all eight slots. Enable bytes are at `0x2000d004 +
+slot`; injected words are at `+0x34 + 4*slot`. These affect the **Euro analyzer's
+inputs/state**, rather than replacing the module's physical measurements.
+
+| Slot | Consumer / units | Evidence |
+| --- | --- | --- |
+| 0 | Module current, signed mA | `0x08017e0e`–`0x08017e2a`, normally module `+0x58`. |
+| 1 | Highest cell voltage, mV | `0x08017e2c`–`0x08017e64`. |
+| 2 | Lowest cell voltage, mV | `0x08017e66`–`0x08017e9e`. |
+| 3 | Module SOC, percent | `0x08017ea0`–`0x08017ebc`, normally module `+0x4c`. |
+| 4 | Accumulated charge throughput, whole Ah | `0x08018948`–`0x08018962`; replaces the whole counter and zeros its mAs remainder, including the mirror. |
+| 5 | Accumulated discharge throughput, whole Ah | `0x08018964`–`0x0801897c`; analogous discharge counter/remainder. |
+| 6 | Both reported charge/discharge cycle estimates, raw integer counts | `0x08018ab0`–`0x08018aba`; replaces the fields reported as `Chg. Dsg. Cycle` and `Chg. Dsg. Cycle2`. |
+| 7 | Lowest cell temperature, mC | `0x08017dd4`–`0x08017e0c`. |
+
+Slots 4/5 are assignments at the start of an integration pass, **not one-time
+counter edits**: the routine can then add the current pass's contribution. It
+integrates twice the current magnitude into an mAs remainder, carrying at
+3,600,000 mAs per Ah (`0x0801897e`–`0x08018a4c`). This establishes their units
+without guessing from the command's help. Slot 7 also feeds extreme-temperature
+accounting (`0x08018908`). Disabling injection stops these overrides; it does not
+restore previous accumulated values. Do not treat `eurostub off` as an undo.
 
 ## Hardware-test procedures visible in the application
 
@@ -626,3 +645,138 @@ must restrict count to the board's actual monitor configuration and no more than
 **two** for these handlers. This is a software buffer bound, not evidence that
 every supported board physically has two ICs. It resolves the handler/driver
 limit without requiring a live overflow probe.
+
+
+## Further runtime-consumer findings
+
+### `mostest` enables active background fault checks (E2)
+
+The stored markers enable byte `0x20000967`, tested at
+`0x08011a84`–`0x08011a8a`. The periodic module path calls this check at
+`0x080072ea`; a separate readiness byte (`0x20000d44`) must also be nonzero.
+Thus enabling the flag is not merely changing a report label or running the
+one-shot `tmos` procedure.
+
+The gated routines are `0x0801182c` and `0x080118ec`:
+
+- The first checks module `+0x270`, two digital input levels, and current below
+  **−999 mA**. It accumulates a byte counter using the module interval; at 6 it
+  starts reporting the condition, and at 10 it sets fault bit `0x800`, resets
+  the counter and invokes callback operation `0x29` with value zero.
+- The second checks module `+0x26f` and another digital input. With current
+  **at least 1000 mA**, it uses a similar 6/10 counter and sets fault bit
+  `0x400` before invoking the same operation. A further branch checks module
+  voltage **at least 60000 mV** or a cell voltage **at least 4200 mV**, with a
+  counter threshold of 16, and can invoke that operation too. Its cell loop
+  includes index equal to the cell count (`0x080119b8`–`0x080119be`), an apparent
+  off-by-one bug; do not copy it into a client implementation.
+- Operation `0x29` is the AFUSE GPIO/persistent-marker operation described in
+  the parameter reference and above. If either routine reports a condition,
+  the caller stores an event and requests both statistics and extended-state
+  persistence (`0x08011aac`–`0x08011aca`).
+
+These are counter thresholds, not a claim of exact seconds. The board's circuit
+and pin polarity are still needed to name the electrical failure precisely or
+prove what the AFUSE circuit physically does. The code does establish that
+`mostest on` can enable consequential background actions.
+
+### `tmprctrl 97/98` and measurement refresh (E2)
+
+Selector **98** writes module `+0x60` and clears the refresh-enable byte at
+`0x20000ccd`. The ordinary measurement path obtains callback operation `0x11`
+into that same module field (`0x0800535a`–`0x08005366`). Both the callback wrapper
+(`0x08011d62`) and reader (`0x080162e4`–`0x0801630c`) consult the enable byte.
+This explains why the supplied value persists across ordinary refreshes; the
+physical identity/location of that second module temperature sensor still needs
+board evidence. Selector 99 similarly shares its refresh gate with cell
+thermometry, so these overrides are not independent channels.
+
+Selector **97** instead sets the override-enable byte at `0x20000ccf` and stores
+its value at `0x20000ce0`. The consumer at `0x08005378` copies it into
+`0x20000cd8`, then tests the unsigned interval **2980–3020 inclusive**. Outside
+that interval it increments a saturating counter; at ten observations it sets
+module fault bit **`0x40`**. An in-range value clears the counter; that branch
+does not itself clear an already-set fault bit.
+
+The normal source for `0x20000cd8` is the monitor auxiliary ADC read at
+`0x08016378`–`0x0801638c`, divided by ten. Selector 97 therefore overrides this
+**monitor-reference diagnostic**, not a cell/environment temperature used by the
+ordinary temperature protection checks. Although the command reuses the signed
+−40000..100000 validation, that does not make this diagnostic's value mC. The
+nominal 3000 and ADC path suggest a reference voltage; its exact physical input
+and calibration require board/monitor evidence. `tmprctrl 0` disables the
+override and re-enables measurement refresh; it does not restore a saved reading
+or explicitly clear the latched fault.
+
+### `tinput present/absent` temporarily drives outputs (E2)
+
+The handler at `0x0802b22c`–`0x0802b290` passes value 3 to module callback
+`+0x28c`, first operation **4**, then operation **5** after a 100-unit delay and
+one input sample. Initialization at `0x08012398`–`0x0801239c` wires that callback
+to `0x08010dc8`. Its jump table resolves those operations to:
+
+| Operation | Visible software action |
+| --- | --- |
+| 4, `0x080111be` | Clear GPIO port `0x40011400` masks `0x40` and `0x20`. |
+| 5, `0x080111e6` | Set the same port's `0x20` mask and clear the halfword at `0x20000d48`. |
+
+The low-level helper at `0x0801e772` writes the set/reset registers, confirming
+actual output writes rather than mere cached-state updates. Neither branch
+saves previous levels; operation 5 does not explicitly restore `0x40`.
+`present` passes when the input identified by `0x40011404` reads zero; `absent`
+passes when it reads nonzero. Thus these forms are **active test sequences with
+forced final levels**, not passive input queries. The physical circuit attached
+to those pins still requires board evidence. `rv`/`dcov` use direct input reads
+and do not take this bracketing path. Pass/fail text matters: both successful
+parsing paths can return zero even when the electrical comparison fails.
+
+### Gauge report scaling (C)
+
+The driver initializer at `0x08022444` passes **4** to `0x080203a8`, which stores
+that byte at `0x20000b48` while installing bus callbacks. `socd` then uses:
+
+| Gauge register | Decoding / reported value |
+| --- | --- |
+| `0x08`, two bytes | Little-endian unsigned pack voltage, mV, no multiplier. |
+| `0x10`, two bytes | Little-endian **signed 16-bit** current multiplied by 4, mA. |
+| `0x02`, one byte | SOC percent, no multiplier. |
+| `0x04`, two bytes | Little-endian unsigned remaining capacity multiplied by 4, mAh. |
+
+Evidence: handler `0x0802117a`–`0x08021204`, initializer
+`0x08022456`–`0x08022462`, scale store `0x080203c0`. This is the initialized
+scale for the reviewed C image, not a universal bq34z100 convention or a detected
+value from the connected battery. `socd` does not check each bus-read return
+before formatting the result; a successful console footer alone does not prove
+all four measurements were read successfully.
+
+### Display cadence and additional cross-image checks
+
+All identified E2 literal references to the display state at `0x20000ce4` are in
+the selection setter, output routine and scheduler. The scheduler only checks
+the enable byte and calls the output routine; neither consumer uses the scalar
+at `+0x14` or the flag at `+0x10`. No effective interval control was established.
+The C setter independently has the same two writes at
+`0x0800a248`–`0x0800a24c`. Keep the positive scalar form documented as a stored
+value, without promising a cadence change.
+
+C `tmprctrl` independently preserves the 97/98 setter layout at
+`0x0800ee9c`–`0x0800eeb2`, using control base `0x200003dc`; its reference consumer
+at `0x0800539c` has the same 2980–3020 check. This verifies that particular
+behavior in both images, not every common command's full equivalence.
+
+### Boundaries of this additional analysis
+
+C independently has the same missing lower-bound check and two raw stores in
+its `oc2d` setter (`0x0800e31c`–`0x0800e340`). The signedness issue therefore
+affects both reviewed images.
+
+The negative `oc2d` setter still demonstrably accepts and stores a signed value,
+but a complete route from that field through hardware programming/protection
+timing was not established. The ordinary software protection dispatch uses
+indirect callback/index tables; finding a signed comparison elsewhere does not
+prove it consumes this particular field. **No claim of immediate protection,
+infinite delay, or harmless no-op is justified.** A future client should still
+accept only 0–5000 ms. This remains a specific downstream-analysis gap.
+
+Physical sensor/pin identities, power-loss/wake behavior, live fault recovery,
+and the absent bootloader remain outside what these application paths prove.

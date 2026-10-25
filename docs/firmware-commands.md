@@ -215,7 +215,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | `tled <selector> [on\|off]` | Test/control LEDs using selector 0, LED number or on/off per help. | L:E | L:E | V |
 | `tibcio <nc\|sc>` | Test IBC I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | V |
 | `tcbnio <nc\|sc>` | Test CBN I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | V |
-| `tmprctrl <flag> [bat-id value]` | Inject runtime temperature or voltage by flag and selector; short form restores measurement flags. | L:D | L:D | V |
+| `tmprctrl <flag> [bat-id value]` | Inject runtime temperature, voltage or a monitor-reference diagnostic by selector; short form restores measurement flags. | L:D | L:D | V |
 | `tsto` | Report cached self-test faults; C only, no output drive. | — | L:E | V |
 | `tver <version>` | Compare hexadecimal value with actual software version; C only, does not set it. | — | L:E | V |
 | `tdct` | Run dry-contact test. | L:E | L:E | V |
