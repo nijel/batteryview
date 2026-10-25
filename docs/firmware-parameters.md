@@ -8,6 +8,8 @@ cleared. **E2 means US_E2_V2.5_Crc.bin; C means US_C_V3.1_Crc.bin.**
 
 Unless explicitly marked C or both, detailed observations are **E2-specific**.
 A shared command name does not establish the same contract on another board.
+The [handler and persistence supplement](firmware-behavior.md) resolves the later
+record-query, callback, calibration, diagnostic and model-comparison findings.
 Analysis was static; none of these operations was tried on a battery. Remaining
 unknowns are called out rather than filled in from command names.
 
@@ -49,8 +51,8 @@ arguments. The forms here describe those **remaining handler arguments**.
 | `logout` | Returns to user mask 1. Does not close the host serial port or request a reset. |
 | `ci` | No operands. Displays communication state; distinct from the buffered-frame dump below. |
 | `ct port` | Port is D, **0 or 1**. Dumps a buffered protocol frame, including SOI, VER, ADR, CID1/CID2/RTN, LENGTH, CHKSUM and EOI. The inspected handler does not enable a continuous trace stream. |
-| `urates [rate]` | No argument reports the unit/RS485-port rate. D rate must be **9600, 115200 or 500000**. A changed value is written as four bytes to EEPROM 0 at `0x7ae` and cached in RAM. Immediate peripheral reinitialization is not established by this handler. This is not the console baud rate. |
-| `setprt [sma\|lg]` | No argument reports the selected protocol. The setter changes protocol-related runtime settings and writes a byte at EEPROM 0 `0x7ab`. Full dependent flag changes and activation timing remain to be traced. |
+| `urates [rate]` | No argument reports the unit/RS485-port rate. D rate must be **9600, 115200 or 500000**. A changed value is written as four bytes to EEPROM 0 at `0x7ae` and cached in RAM. The handler does not reconfigure the UART; see the supplement for driver initialization and hardware-selected rate behavior. This is not the console baud rate. |
+| `setprt [sma\|lg]` | No argument reports the selected protocol. The setter changes protocol-related runtime settings and writes a byte at EEPROM 0 `0x7ab`. Immediately changes live protocol callbacks and CAN configuration; see the supplement for function addresses and 500000-rate activation. |
 | `lg [cstm\|sys en\|dis]` | No arguments reports customer/system CAN-ID state. Setters use separate EEPROM-1 flags/check bytes: customer `0x3a/0x3b`, system `0x3c/0x3d`; enabled marker `0x55`, disabled marker zero. These flags are not a console baud setting. |
 
 Evidence: E2 `login` `0x08025578`, `logout` `0x08025604`, `ct`
@@ -84,13 +86,13 @@ installed modules. Reject absent placeholders when building a collection list.
 | `data [kind [index]]` | No arguments selects the latest event. `data kind` selects that kind's latest item. An explicit index is D, narrowed to u16, and must be **less than the selected count**; indices are zero-based. An empty collection has a separate no-data path. |
 | `datalist kind [start]` | Start is a decimal record index, not a requested count. Lists summary rows and may paginate. Determine the available count instead of probing arbitrarily high indices. |
 | `datalist kind dtls start` | Handler-recognized detailed form omitted from help. `start` is D. This is separate from `data kind index`, which retrieves an individual record. |
-| `datalist kind ...` | Additional `item`/`bat` selections and `id/volt/curr/temp/coul` field selectors exist. Their complete positional combinations, per-cell numbering and limits remain unverified; do not derive a query builder from the help string alone. |
-| `save [event\|history]` | No argument defaults to event; `event` selects callback argument 0 and `history` selects 1. Unknown names fail. Tail-calls the module record-save callback, propagating its return status. Actual payload completion/persistence still depends on that callback. |
+| `datalist kind ...` | Exact forms are `datalist kind bat field start` and `datalist kind bat cell field start`, with zero-based cell. `item` is not an E2 literal selector. See the supplement for scaling, paging and malformed-input quirks. |
+| `save [event\|history]` | No argument defaults to event; `event` selects callback argument 0 and `history` selects 1. Unknown names fail. Tail-calls the module record-save callback, propagating its return status. The synchronous writer, slot allocation and count-update failure behavior are traced in the supplement. |
 | `datac [event\|history\|event_log\|use]` | No argument resets **both event and history bookkeeping without entering the flash-erasure loop**. Explicit event/history also erases the corresponding flash allocation. The other kinds clear separate counters/metadata. See the storage map below; this is not a general EEPROM erase. |
 | `log [count]` | Separate diagnostic ring. Count is D, **1–32**. No argument uses the available count, or 32 for a wrapped ring. Traverses newest first; records are 20 bytes at EEPROM 0 `0x6c + index*20`. Behavior when requesting more than the available entries should not be used to infer valid historical records. |
 | `logc` | Clears diagnostic-ring index/wrap state and writes a two-byte zero at EEPROM 0 `0x387`. This does not establish that old payload bytes are erased. |
 | `logt value` | Value is H. Injects an internal test-log event through the logger with code `0x600`, source/argument 1 and the supplied 32-bit value. |
-| `statc` | Clears 60 halfword statistics fields starting at module offset `0x08c`, preserving/restoring reset, life-warning and life-alarm fields at `0x0ce/0x0de/0x0e0`. Calls a state callback afterward; its full persistence semantics remain unverified. |
+| `statc` | Clears 60 halfword statistics fields starting at module offset `0x08c`, preserving/restoring reset, life-warning and life-alarm fields at `0x0ce/0x0de/0x0e0`. Synchronously saves the 124-byte block at EEPROM 0 `0x38f` through the resolved callback; individual command return handling still matters. |
 | `tcycle [count]` | No argument reports cycle count and real coulomb value. D count **0–10000** changes the cycle field and recalculates related runtime coulomb state; this is not just a counter display. No direct EEPROM write was found in the handler. |
 
 Supported record kinds advertised by the firmware are `event`, `history`, `pov`,
@@ -120,8 +122,8 @@ descriptor for the requested kind, and performs these operations:
 The explicit event/history paths get their start address, allocation length and
 erase granularities from runtime storage descriptors. The loop calls flash
 helpers `0x0801fd48` / `0x0801fd98`, which emit address-bearing SPI commands
-`0x20` / `0x52`. Exact allocation addresses and chip-specific erase geometry
-remain to be established; neither is a command parameter.
+`0x20` / `0x52`. The supplement traces the E2 event/history allocation addresses and 4 KiB/32 KiB
+erase geometry; neither is a command parameter.
 
 Bookkeeping is reset **before** payload erasure. EEPROM return codes are
 accumulated; a nonzero total produces handler return 5. The erase-helper results
@@ -132,8 +134,8 @@ operation as though it were a read or claim transactional clearing.
 
 `save` at `0x08009074` dispatches through `0x080073ec`; no argument selects an
 event. It requests a fresh record, rather than flushing every existing record or
-saving configuration. The callback's physical storage sequence remains a
-separate analysis task.
+saving configuration. The callback's physical storage sequence and error handling are documented in
+the supplement.
 
 ## SOC, capacity and small configuration settings
 
@@ -141,7 +143,7 @@ separate analysis task.
 | --- | --- |
 | `setsoc percent` | D, narrowed to u16, then checked **0–100**. Updates each cell's runtime remaining-charge and percentage fields using configured capacity. No direct EEPROM write in this handler. Distinct from BatteryView's erase/restart SOC-reset sequence. |
 | `totalcoul [capacity]` | No argument reads eight bytes from EEPROM 1 `0x21` and displays capacity in mAh after dividing internal coulomb units by 3600. Setter is D **50, 74 or 100 Ah**; multiplies by 3,600,000, updates runtime capacity and related model data, writes capacity at `0x21` and check byte `0x29`. It is nominal configuration, not an arbitrary learned-capacity value. |
-| `emptyvolt [threshold]` | No argument reports `Coul:0% Volt`. D → u16; accepts **500–3300 inclusive**, writes two bytes to EEPROM 0 `0x7a3` and updates RAM. The scale resembles cell mV, but the physical interpretation/consumer still needs confirmation. |
+| `emptyvolt [threshold]` | No argument reports `Coul:0% Volt`. D → u16; accepts **500–3300 inclusive**, writes two bytes to EEPROM 0 `0x7a3` and updates RAM. The SOC consumer compares it directly with the **cell voltage in mV**; see the supplement for the clamp path. |
 | `blocksoc [percent]` (C) | No argument reports the recommended block-current SOC. D → u16, **1–100 inclusive**; a change writes two bytes at EEPROM 0 `0x7ac`. |
 | `setlowcfg` | Reports `ShutSoc` and `ShutSocTime`. |
 | `setlowcfg shutsoc value` | D → u16; stores a runtime shutdown-SOC field. No additional percentage bound was found in this branch; a client should not accept arbitrary 16-bit values merely because firmware does. |
@@ -169,8 +171,8 @@ For normal, non-overflowing input the checks are:
 Do not reproduce the byte-wrap acceptance bug. Send six separate tokens, not an
 ISO timestamp. E2 handler `0x080289cc`, validation through `0x08028ac4`.
 `cmudtesttime [year month day hour minute second]` is a separate manufacturing
-timestamp with an EEPROM-0 field at `0x3d`; its exact format/range and relation to
-RTC time still need independent validation.
+timestamp with an EEPROM-0 field at `0x3d`; the supplement confirms the same
+component bounds as `time`, writing seven EEPROM bytes rather than setting RTC.
 
 ## EEPROM, flash and raw MCU memory
 
@@ -209,9 +211,9 @@ are E2 observations; entry addresses for each command are in the JSON.
 | `inash` | No operands; register report. Stale help calls it `socsh`, which is not an E2 registered alias. |
 | `inacal` | Reads/reports the current coefficient, offset and calibration mode through module callbacks. |
 | `inacal 10000` | Signed-decimal input is parsed, but this branch accepts **10000 only**. Performs current calibration, including measurement sampling and coefficient/offset calculation; coefficient acceptance includes **800–1200**. Requires INA226 hardware identity. Invalid calibration conditions can print failure and return zero. |
-| `inacal currcoe value` | D value sets the coefficient through callback operation `0x54`. This manual branch does not apply the automatic calibration branch's 800–1200 check. Full callback persistence requires further tracing. |
+| `inacal currcoe value` | D value sets the coefficient through callback operation `0x54`. This manual branch does not apply the automatic calibration branch's 800–1200 check. Persists four bytes plus a check byte at EEPROM 1 `0x30`. |
 | `inacal curroffset value` | D value sets the offset through callback operation `0x30`. Despite the signed-looking output label, this manual setter calls the **unsigned** parser. |
-| `currcal [value]` | Separate handler, signed-decimal value. Intended reference is **10000**, but other values merely print `Err Val != 10000` and **continue into the calibration path**. The routine can close/reopen MOS outputs and invoke calibration callbacks. No argument calls a separate callback operation 2; its exact effect remains unverified. A client must not rely on the error message to prevent mutation. |
+| `currcal [value]` | Separate handler, signed-decimal value. Intended reference is **10000**, but other values merely print `Err Val != 10000` and **continue into the calibration path**. The routine can close/reopen MOS outputs and invoke calibration callbacks. No argument calls callback operation 2, now traced as coefficient/offset reporting. See the supplement for the zero/reference sampling and persistent fields. A client must not rely on the error message to prevent mutation. |
 
 E2 `inacal` `0x0802190c`; manual setters `0x08021b26`–`0x08021ba6`,
 read path `0x08021ba8`–`0x08021bea`. The procedure manipulates hardware state;
@@ -227,9 +229,9 @@ it is not a harmless report with an optional numeric filter.
 | `socd` | Reads gauge data including pack voltage, signed current, SOC and remaining capacity. The table permits two extra tokens, but the inspected handler does not consume them. Current/capacity scaling uses a runtime factor. |
 | `soct` | Reads chemistry ID and Ra/resistance-table information, including flags and table entries. Permitted extra tokens are not consumed by this handler. |
 | `soccfg` | Lists named data-flash fields, subclass, offset and decoded value using a descriptor table. |
-| `soccfg subclass offset [value]` | Subclass and offset are **D**, narrowed to u16 and matched to descriptor fields. A matching descriptor controls width and signed/unsigned/other value encoding. This is **not** a generic arbitrary-width raw-memory write. Complete type-specific write formats and behavior for an unknown descriptor remain unverified. |
-| `soccal {volt\|current\|tempr\|ccoffset\|bdoffsetP1\|bdoffsetP2} [value]` | Separate quantity-specific calibration paths; board-offset phases have state/ordering requirements. Full units, required values, limits, timing and cleanup remain unverified. Do not expose a generic numerical setter based on these names. |
-| `socclr` | Calls the gauge clear/default-restoration routine. Registered help says it clears bq34z100 data flash and reloads defaults. The handler ignores permitted extra tokens and returns zero regardless of the callee result. Exact changed subclasses/bytes remain unverified. |
+| `soccfg subclass offset [value]` | Subclass and offset are **D**, narrowed to u16 and matched to descriptor fields. A matching descriptor controls width and signed/unsigned/other value encoding. This is **not** a generic arbitrary-width raw-memory write. All eight encodings, the 38 supported pairs, and the faulty sentinel/parser validation are documented in the supplement. |
+| `soccal {volt\|current\|tempr\|ccoffset\|bdoffsetP1\|bdoffsetP2} [value]` | Separate quantity-specific calibration paths; board-offset phases have state/ordering requirements. See the supplement for query/set forms, offset phases, no-op `tempr` path, sampling and timeout/cleanup bugs. These are not generic numerical setters. |
+| `socclr` | Calls the gauge clear/default-restoration routine. Registered help says it clears bq34z100 data flash and reloads defaults. The handler ignores permitted extra tokens and returns zero regardless of the callee result. Runs the recovered **182-step programming script**, broader than the descriptor settings; script targets, chunk counts and interpreter behavior are in the supplement. |
 
 C `soccfg` `0x080208d4`, descriptor lookup `0x08020ae6`–`0x08020b56`;
 `socclr` calls `0x080202ec`. Gauge data flash is separate from either `eepe` chip.
@@ -278,11 +280,11 @@ The other selector groups and their confirmed units/roles are:
 
 | Selectors | Meaning and parameter status |
 | --- | --- |
-| `bot botr bht bhtr blt bltr but butr` | Battery temperature protection/recovery fields, mC. Branches operate on charge/discharge-related fields; do not assume a single universal temperature limit. |
-| `eot eotr eht ehtr elt eltr eut eutr` | Environment temperature thresholds/recovery; individual cross-field and constant bounds need completion. Some diagnostic strings contain incorrect field names. |
-| `mot motr` | Additional temperature-protection/recovery branches. Physical sensor mapping and exact bounds remain unverified. |
-| `coc coca cocar` | Charge current protection/alarm/recovery values, mA. Ordering depends on the current related fields and short-circuit threshold. |
-| `doc doca docar` | Discharge current protection/alarm/recovery values, **negative mA** in the validation strings and signed parser. Do not send unsigned magnitudes as charge/discharge-interchangeable values. |
+| `bot botr bht bhtr blt bltr but butr` | Battery temperature protection/recovery fields, mC; exact cross-field/constant bounds and mirrored charge/discharge writes are in the supplement. |
+| `eot eotr eht ehtr elt eltr eut eutr` | Exact bounds are in the supplement, including the legacy-field comparison mismatch and asymmetric endpoints. |
+| `mot motr` | Exact mC bounds are in the supplement; physical sensor wiring remains a hardware question. |
+| `coc coca cocar` | Charge current protection/alarm/recovery values, mA; exact predicates, including rejected zero recovery value, are in the supplement. |
+| `doc doca docar` | Discharge current protection/alarm/recovery values, **negative mA**; exact predicates and strict zero exclusion are in the supplement. |
 | `sc` | Short-circuit threshold, negative mA: **−300000 <= x < min(0, doc, −coc)**. Strictly below both related thresholds. |
 | `ocd ocr oc2d oc2r scd scr` | Protection delay/recovery values, ms; exact bounds and the `oc2d` signedness bug are listed below. |
 | `clc` | Current-limit value, mA: **1–10000 inclusive**. Stores the same value in pack and cell parameter structures. |
@@ -303,7 +305,7 @@ that a setting changed. E2 jump table `0x0800cc18`, common exit `0x0800e8ee`.
 interval field at EEPROM 0 `0x38d`. `config default` calls the corresponding
 restore-default callbacks, changes scheduling values and writes that interval
 field too. These are state-changing actions, not ways to display defaults.
-The full callback storage map is not yet established; do not describe either as
+The supplement supplies the resolved word/check-byte storage map. Neither is
 an erase of all settings. Branches `0x0800e472`–`0x0800e5b2`.
 
 ### Delay/recovery limits and a signedness bug
@@ -342,9 +344,8 @@ config sleep day start-hour start-minute end-hour end-minute
 
 All four numbers are D; normal values are hour 0–23, minute 0–59. Firmware
 narrows them to bytes before checking. Start and end must differ; an end earlier
-than start sets an internal next-period flag. Weekly/monthly paths also exist
-and carry day fields, but day numbering and complete token validation remain to
-be documented before exposing those setters. `config record` has corresponding
+than start sets an internal next-period flag. Weekly/monthly forms and Monday=1 weekday numbering are now documented in the
+supplement. `config record` has corresponding
 on/off/day/week/month paths; do not assume its state polarity matches sleep.
 
 Hardware sleep uses a **different syntax than the help suggests**:
@@ -369,8 +370,8 @@ numeric threshold. The [34-selector list](firmware-commands.md#protection-and-co
 includes battery charge/discharge temperature protections separately, pack
 protections, buzzer and smart-charge controls. The masks are not simply
 `1 << selector_index`: the jump table maps names to bits with gaps. E2 handler
-`0x0800e96c`, selector dispatch `0x0800ea0c`. Exact persistence and each special
-control's effect remain to be traced.
+`0x0800e96c`, selector dispatch `0x0800ea0c`. Mask persistence uses callback 0x19 and its two EEPROM blocks, as traced in the
+supplement; electrical meanings still require board context.
 
 `ctrl` displays state. E2 accepts `ctrl target` queries and, for implemented
 setters, `ctrl target on|off` or the numeric form below. Dispatch is at
@@ -385,8 +386,8 @@ other action strings are rejected except on the numeric PWM paths.
 | `pwmc` | Query reports state and a percentage with one decimal place. D numeric setter clamps to **0–1000**, representing **0.0–100.0%**; `on`/`off` also parse but store 1/0 in the same numeric field. The setter changes a runtime field, not a proven PWM-enable flag. |
 | `pwmp` | Numeric parser clamps to **20000–200000**, but the E2 dispatch entry goes straight to the exit; no implemented effect. Do not infer frequency units or a working setter. |
 | `softstart` | Query reads GPIO. Both `on` and `off` reach a branch that compares the **argument count with 1**, instead of the parsed action. Since a setter has three total tokens, both take the same output-control path. Treat as a firmware bug, not a reliable Boolean setter. |
-| `i2c` | Bare target calls a peripheral-control helper with argument zero; it is **not a status query**. The `on`/`off` forms do not reach that call. Exact peripheral semantics still need driver tracing. |
-| `afuse` | Passes inverse on/off state to module callback operation `0x29`, then reports the cached AFUSE flag. The handler prints `Nonsupport currlimit mode` as well; physical fuse semantics remain unverified. Bare target follows the same default-zero action path rather than a pure query. |
+| `i2c` | Bare target **clears bit 0 of I2C1 control register at 0x40005400**, disabling the peripheral; it is **not a status query**. The `on`/`off` forms do not reach that call. Helper `0x0802b958` has no restore step. |
+| `afuse` | Passes inverse on/off state to module callback operation `0x29`, then reports the cached AFUSE flag. The handler prints `Nonsupport currlimit mode` as well; persistent EEPROM markers/GPIO effects are now traced in the supplement; the physical circuit action remains board-specific. Bare target follows the same default-zero action path rather than a pure query. |
 | `agelog` | Query reads EEPROM 0 `0x7b7`; marker `0x5a` enables the cached flag. Setter persists `0x5a` for on, zero for off. |
 | `mostest` | Query reads EEPROM 0 `0x7f4` and EEPROM 1 `0x2a`; either `0x5a` marker enables the cached flag. Setter writes both locations with `0x5a` or zero. Actual MOS-test consumer behavior remains unverified. |
 
@@ -402,7 +403,7 @@ for reporting. E2 `0x0800fce8`–`0x0800fd8c`; this inverted stored marker is no
 an ordinary persisted Boolean.
 
 `couls [iah|vah|asic|default]` advertises coulomb-calculation modes but is
-remote-only in both images; transport entry and mode semantics remain unresolved.
+remote-only in both images; the supplement maps runtime mode numbers and confirms rejection by the normal E2 local-first frontend.
 
 ## Manufacturing tests and injected readings
 
@@ -428,8 +429,8 @@ of the standard console footer.
 Evidence: E2 `tbar` `0x0802b080`, `tinput` `0x0802b1b8`, `tchgc`
 `0x0800f75c`, `tdisc` `0x0800f888`, `tvolt` `0x0800f418`, `ttmp`
 `0x0800f548`, `teepr` `0x0801045a`. C `tchgc`/`tdisc` permit at most **one**
-operand; do not send the E2 tolerance operand there. C defaults/tolerances need
-independent tracing.
+operand; do not send the E2 tolerance operand there. C defaults/tolerances were independently traced and are tabulated in the
+supplement; notably its one-operand discharge test uses ±50 mA.
 
 ### `tmprctrl`: the selector also chooses the quantity
 
@@ -461,12 +462,12 @@ runtime injected readings/flags, not temperature calibration EEPROM writes.
 
 | Command | Known form and unresolved details |
 | --- | --- |
-| `bmicrdcfg total-ic`, `bmicrdcomm total-ic` | Required **D** IC-count operand. E2 `bmicrdcfg` rejects zero; `bmicrdcomm` has no corresponding zero check. Both pass a u8 count to a driver with a fixed local buffer; no upper bound is enforced in the handler. Hardware-supported maximum and driver bounds remain unverified; do not expose unrestricted counts. |
-| `disp ...` | Repeated-display selections include `pwrs`, `bats`, `volt`, `curr`, `temp`; numeric selectors/intervals exist. Complete positional syntax, interval units and stop behavior remain unverified. |
-| `euro ...`, `eurostub ...` | Optional module/test operands exist; full field meanings and effects remain unverified. `eurostub` must not be classified as a read. |
-| `tled selector [on\|off]` | Numeric LED selection and special group/all paths exist; complete selector/action combinations remain unverified. |
-| `tmos {cfet\|dfet}` | Chooses the charge/discharge MOSFET test. Timing, restoration and required external conditions remain unverified. |
-| `tibcio {nc\|sc}`, `tcbnio {nc\|sc}` | Exact string choices; electrical meaning, expected fixture conditions and side effects remain unverified. |
+| `bmicrdcfg total-ic`, `bmicrdcomm total-ic` | Required **D** IC-count operand. E2 `bmicrdcfg` rejects zero; `bmicrdcomm` has no corresponding zero check. Both pass a u8 count after setup; no upper bound is enforced. The reader copies eight bytes per IC into the command’s 16-byte buffer: **count >=3 overflows it**. Restrict to the actual board count and at most two; details in supplement. |
+| `disp ...` | Repeated-display selections include `pwrs`, `bats`, `volt`, `curr`, `temp`; numeric selectors/intervals exist. Complete selection forms and `disp 0` stop behavior are in the supplement; a positive scalar writes fields not consulted by the reviewed display consumer, so time units are not assumed. |
+| `euro ...`, `eurostub ...` | Report/clear and init/off/three-number injection forms, slot bounds and the non-master Euro pointer bug are in the supplement. |
+| `tled selector [on\|off]` | `tled`, `tled on|off`, `tled 1..8 on|off` and `tled 0` are traced in the supplement, including persistent test-mode flag behavior. |
+| `tmos {cfet\|dfet}` | Selects FET test; initial-current bounds, clear/set sequence, delays and forced restoration level are in the supplement. External fixture requirements remain board-specific. |
+| `tibcio {nc\|sc}`, `tcbnio {nc\|sc}` | Passive logical-input comparisons: nc expects 1, sc expects 0; tested SLAVED/HOSTED/DCIN signals and status handling are in the supplement. |
 | `tver version` (C) | Required **H** value, compared with the runtime software-version word; it **does not set a version**. Prints pass/fail and the actual version as `V(high bits).(low byte)`, then returns zero even on mismatch. C `0x0800fbdc`–`0x0800fc34`. |
 
 ### No-operand hardware handlers
@@ -477,20 +478,20 @@ remaining help-based purposes do not establish a complete electrical test proced
 
 | Command | Advertised role / remaining question |
 | --- | --- |
-| `tbuz` | Buzzer test; duration/restoration unverified. |
+| `tbuz` | Drives buzzer set, delays 1000 helper units, then clears it; no sound verification or arbitrary prior-state restoration. |
 | `tetmp` | E2 computes the signed integer average of cell temperatures, refreshes two module sensor fields via callbacks and checks **each lies between average −10000 and average +30000 mC inclusive**. Prints pass/fail and sensor/average values, but returns zero even on test failure. Handler `0x0800f654`–`0x0800f70a`; physical identity of the two sensors remains unverified. |
-| `tflash` | Flash test; modified region/restoration unverified. |
-| `ti2c` | I2C test; buses/devices and writes unverified. |
-| `tusart` | USART test; loopback/port requirements unverified. |
-| `tdct` | Dry-contact test; output sequence/restoration unverified. |
-| `tclear` | E2 zeros event/history write indices at EEPROM 0 `0x389/0x38b`, diagnostic-log index at `0x387` (two bytes each), and associated RAM count/wrap fields. Clears the same runtime statistics as `statc`, preserving reset/life-warning/life-alarm counts, then invokes its state callback. Also zeroes 0x128 runtime bytes at module `0x104` and calls `0x0800457a`; that callee’s further effects remain unverified. No flash-erasure loop in this handler. Prints the pass string and returns zero without checking EEPROM write results; **not equivalent to datac or full EEPROM erase**. E2 `0x0800fb00`–`0x0800fbb2`. |
-| `tsoftdsg` | Soft-discharge test; power-path effects and duration unverified. |
-| `trdagevolt` | Recorded aging-voltage report; record format and scope unverified. |
-| `tagevolt` (C) | Aging-voltage test; storage/output effects unverified. |
-| `tpwr` (C) | Total-voltage test; acceptance limits unverified. |
-| `tsoh` (C) | SOH test; mutation versus reporting unverified. |
-| `tsto` (C) | Self-test output; electrical sequence unverified. |
-| `tsoc` (C) | Gauge test; writes/calibration changes unverified. |
+| `tflash` | Erases sector at address 0, writes/checks 55, erases/checks FF, then clears record metadata; no restoration of old sector contents. See supplement. |
+| `ti2c` | Checks buses 2/3 and EEPROM identity, including an un-restored six-byte write to EEPROM 1 offset 0. See supplement. |
+| `tusart` | USART1 four-byte send/receive test with unbounded transmit-ready loops; see supplement for peripheral and cleanup limits. |
+| `tdct` | Steps three GPIO outputs while testing a logical return input, leaves outputs cleared; sequence and masks in supplement. |
+| `tclear` | E2 zeros event/history write indices at EEPROM 0 `0x389/0x38b`, diagnostic-log index at `0x387` (two bytes each), and associated RAM count/wrap fields. Clears the same runtime statistics as `statc`, preserving reset/life-warning/life-alarm counts, then invokes its state callback. Also zeroes 0x128 runtime bytes at module `0x104` and calls `0x0800457a`; that callee saves the 296-byte extended-state block with its checksum, as resolved in the supplement. No flash-erasure loop in this handler. Prints the pass string and returns zero without checking EEPROM write results; **not equivalent to datac or full EEPROM erase**. E2 `0x0800fb00`–`0x0800fbb2`. |
+| `tsoftdsg` | Controls soft-start/FET flags, checks three-sample current sum and later off-current, then forces controls on; see supplement. |
+| `trdagevolt` | Reads EEPROM-0 extrema, four voltage/current pairs and aged OV limits; offsets in supplement. |
+| `tagevolt` (C) | Read-only EEPROM minimum-voltage comparison; passes at >=3451 mV. See supplement. |
+| `tpwr` (C) | Cached pack-voltage comparison, >=50000 mV passes; no write or upper bound. |
+| `tsoh` (C) | Read-only SOH-event count check; zero passes, nonzero fails. Footer still succeeds. |
+| `tsto` (C) | Read-only cached system-fault report, **does not drive an output**. Mask and categories in supplement. |
+| `tsoc` (C) | Can run the embedded gauge-programming script when version !=6 and issue gauge reset; see supplement. |
 
 ## Reset, shutdown and update
 
@@ -502,11 +503,13 @@ They are actions, not session-exit commands.
   itself mean “clear SOC” or “erase EEPROM.”
 - `shut`: E2 `0x0800c498` sets shutdown-related module flags; the master has a
   broadcast path and non-master handling differs. No “type twice to confirm”
-  guard was found inside this handler. Exact physical shutdown timing and wake
-  conditions remain unverified.
-- `updata`: enters the firmware-update workflow. Subsequent transfer framing,
-  image validation and completion/recovery are separate from text-console
-  parameters and remain outside this parameter reference.
+  guard was found inside this handler. The supplement traces persistence/control
+  steps and the `Power Input OK, Cannot shut down!` refusal path; power removal
+  and wake sources depend on circuitry.
+- `updata`: writes boot marker `0x55aa55aa` at MCU flash `0x0803f000`, checks
+  status and resets. The actual receiver is in the missing bootloader region;
+  the supplement documents why its transfer protocol cannot be read from these
+  application images.
 
 Do not automatically repeat state-changing commands after a timeout. For future
 implementation, use the confirmed forms above, validate inputs more strictly

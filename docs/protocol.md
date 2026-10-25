@@ -174,7 +174,9 @@ of the saved recovery state; there is no automatic resume command.
 ## Firmware evidence for SOC reset
 
 For all registered commands, access modes and per-image handler addresses, see the
-[firmware command reference](firmware-commands.md).
+[firmware command reference](firmware-commands.md). The
+[handler supplement](firmware-behavior.md#what-the-persistence-callbacks-actually-do)
+resolves immediate statistics/extended-state saves and record-write behavior.
 
 Static inspection of the user-supplied firmware archive now establishes the erase
 scope for two specific images. Neither firmware was executed or flashed. The

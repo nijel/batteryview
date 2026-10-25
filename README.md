@@ -325,7 +325,10 @@ console commands in the two reviewed firmware images, including access modes,
 model differences and confirmed effects. Exact extracted metadata is available
 in [JSON](docs/firmware-commands.json). The [parameter reference](docs/firmware-parameters.md)
 adds accepted forms, numeric bases, ranges, defaults, storage effects and known
-firmware validation bugs, with explicit gaps where analysis is incomplete.
+firmware validation bugs. The [handler supplement](docs/firmware-behavior.md)
+traces record queries, persistence, calibration and test side effects; its
+[detail extractor](scripts/extract_firmware_details.py) reproduces decoded
+metadata without including firmware payloads or original logs.
 
 GUI, TCP adapters, XLSX exports, parameter editing, firmware updating, and
 arbitrary service scripts are outside this first implementation.

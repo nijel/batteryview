@@ -19,6 +19,9 @@ selector tables for config/prot/ctrl/datalist. The firmware
 hashes distinguish these observations from guesses based on another revision.
 The [parameter and effects reference](firmware-parameters.md) documents handler-derived
 argument bases, ranges, defaults, storage effects and unresolved contracts.
+The [handler/persistence supplement](firmware-behavior.md) adds full record-query
+forms, callback storage layouts, calibration and hardware-test behavior, with
+[reproducible decoded metadata](firmware-details.json).
 [Reset analysis](protocol.md#firmware-evidence-for-soc-reset) provides the deeper
 EEPROM and restart findings.
 
@@ -108,12 +111,12 @@ acronyms and undocumented argument meanings are left unresolved.
 | `bat [pwr] [index]` | Show battery/cell readings; exact selection defaults are handler-specific. | L:U | L:U | V |
 | `pwr [index]` | Show module power summaries, including absent rack slots. | L:U | L:U | V |
 | `getpwr [index]` | Show detailed module/cell readings in hash-delimited form; checks optional module selection. | L:U | L:U | V |
-| `pwrsys [argument]` | Show power-system status; table permits one argument that help does not explain. | L:E | L:E | V |
+| `pwrsys [argument]` | Show system status or selected module charge/discharge recommendations. | L:E | L:E | V |
 | `soh [addr]` | Show state of health; remote-only in E2, local and remote in C. | R:U | L/R:U | V |
-| `tsoh` | SOH test/report routine; C image only, not established as a pure read. | — | L:E | H |
-| `disp [selection...]` | Configure periodic display of module/cell quantities. | L:U | L:U | H |
-| `euro [arguments...]` | Euro status-list display; argument fields are not described by help. | L:U | L:U | H |
-| `eurostub [arguments...]` | Euro status test stub; argument fields/effects need handler review. | L:U | L:U | H |
+| `tsoh` | Read-only SOH event-count test; C only. | — | L:E | V |
+| `disp [selection...]` | Select background module/cell display; zero stops it. | L:U | L:U | V |
+| `euro [arguments...]` | Euro metrics report, optional module selection, or mutating clear. | L:U | L:U | V |
+| `eurostub [arguments...]` | Report, initialize or inject runtime Euro test slots. | L:U | L:U | V |
 
 ### Recorded data and counters
 
@@ -128,7 +131,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | `log [data]` | Show internal diagnostic log information. | L:U | L:U | V |
 | `logc` | Clear internal log count/wrap bookkeeping; E2 writes chip-0 offset 0x387. | L:C | L:C | V |
 | `logt <data>` | Generate test log data. | L:D | L:D | V |
-| `tclear` | Clear record indices, runtime counts/statistics and additional record state; callback effects remain partly unresolved. | L:E | L:E | V |
+| `tclear` | Clear record indices and runtime statistics; persist both state blocks. | L:E | L:E | V |
 | `tcycle [cycle-times]` | Set/test the cycle-count value; do not treat as a read. | L:D | L:D | V |
 
 ### Configuration, protection and SOC
@@ -138,7 +141,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | `config [key] [values...]` | Read/change protection and scheduling parameters; includes save/default actions. | L/R:C | L/R:C | V |
 | `prot [key] [en\|dis]` | Read/change protection enablement; includes default and smart-charge controls. | L/R:C | L/R:C | V |
 | `ctrl [target] [value]` | Read/control FETs, outputs and test flags; handler supports more targets than help lists. | L/R:C | L/R:C | V |
-| `couls [iah\|vah\|asic\|default]` | Select/report coulomb calculation mode; registered only in the remote table. | R:D | R:D | H |
+| `couls [iah\|vah\|asic\|default]` | Select/report coulomb calculation mode; registered only in the remote table. | R:D | R:D | V |
 | `autoswitch [1\|0]` | Read/control automatic-switching enablement. | L:D | L:D | V |
 | `setlowcfg [save\|shutsoc\|sstime] [num]` | Read/set low-SOC shutdown settings; E2 save path reports unsupported. | L:D | L:D | V |
 | `setsoc <0..100>` | Set per-cell runtime remaining charge/SOC; distinct from BatteryView SOC reset. | L:C | L:C | V |
@@ -146,7 +149,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | `blocksoc [val]` | Read/set block-current SOC percentage; C accepts 1–100. | — | L:C | V |
 | `totalcoul [val]` | Read/set configured nominal capacity; E2 accepts 50, 74 or 100 Ah and stores chip-1 data. | L:C | L:C | V |
 | `time [yy MM dd hh mm ss]` | Read/set battery RTC; six date/time values when setting. | L:U | L:U | V |
-| `cmudtesttime [year month day hour minute second]` | Device-test timestamp command; exact read/write behavior needs review. | L:U | L:U | H |
+| `cmudtesttime [year month day hour minute second]` | Read/write EEPROM manufacturing-test timestamp; separate from RTC. | L:U | L:U | V |
 
 ### EEPROM, external flash and memory
 
@@ -174,11 +177,11 @@ acronyms and undocumented argument meanings are left unresolved.
 | `socw <offset> <value>` | Write C-image fuel-gauge register. | — | L:D | V |
 | `socsh` | Show C-image fuel-gauge registers. | — | L:D | V |
 | `soccfg <subclass> <offset> <value>` | Write fuel-gauge subclass/data configuration. | — | L:D | V |
-| `soccal <quantity> <value>` | Calibrate voltage/current/temperature or current-counter/board offsets. | — | L:D | H |
+| `soccal <quantity> <value>` | Calibrate voltage/current/temperature or current-counter/board offsets. | — | L:D | V |
 | `socd [arguments...]` | Show fuel-gauge data; table permits two arguments absent from help. | — | L:D | V |
 | `socclr [argument]` | Clear bq34z100 data flash and reload defaults according to help; separate from eepe. | — | L:C | V |
 | `soct [arguments...]` | Show fuel-gauge Ra table; table permits two arguments absent from help. | — | L:D | V |
-| `tsoc` | Run bq34z100 test routine; not established as read-only. | — | L:E | H |
+| `tsoc` | Gauge test that can run embedded programming script and reset; C only. | — | L:E | V |
 
 ### Reset, power control and firmware transfer
 
@@ -186,40 +189,40 @@ acronyms and undocumented argument meanings are left unresolved.
 | --- | --- | --- | --- | --- |
 | `trst` | Soft system reset; E2 ultimately requests Cortex-M SYSRESETREQ. | L:U | L:U | V |
 | `shut` | Request shutdown; confirmation/repetition behavior must follow the handler. | L:U | L:U | V |
-| `tsoftdsg` | Run soft-discharge test routine; distinct from ordinary status reads. | L:D | L:D | H |
-| `updata` | Enter firmware update workflow; subsequent transfer is a separate protocol. | L:U | L:U | H |
+| `tsoftdsg` | Run soft-discharge test routine; distinct from ordinary status reads. | L:D | L:D | V |
+| `updata` | Write bootloader marker and reset; transfer receiver is absent from these images. | L:U | L:U | V |
 
 ### Manufacturing and hardware tests
 
 | Command / compact syntax | Purpose | E2 | C | Evidence |
 | --- | --- | --- | --- | --- |
 | `tbar <barcode>` | Validate/write barcode; E2 requires 16 alphanumeric characters and checks selected cell-count cases. | L:E | L:E | V |
-| `tbuz` | Run buzzer test. | L:E | L:E | H |
+| `tbuz` | Run buzzer test. | L:E | L:E | V |
 | `tchgc [current [limit]]` | Charge-current test; E2 and C argument limits differ. | L:E | L:E | V |
 | `tdisc [current [limit]]` | Discharge-current test; E2 and C argument limits differ. | L:E | L:E | V |
 | `tvolt [value]` | Cell voltage test; E2 optional value is allowed spread in mV. | L:E | L:E | V |
-| `tpwr` | Test total module voltage; C only. | — | L:E | H |
+| `tpwr` | Test total module voltage; C only. | — | L:E | V |
 | `ttmp [value]` | Cell temperature test; E2 optional value is allowed spread in mC. | L:E | L:E | V |
 | `tetmp` | Compare two temperature sensors against the cell-temperature average; E2 accepts −10/+30 °C offsets. | L:E | L:E | V |
 | `tinput <rv\|dcov\|absent\|present>` | Test selected input condition; present/absent branches invoke hardware callbacks. | L:E | L:E | V |
-| `tmos <cfet\|dfet>` | Test selected MOSFET. | L:E | L:E | H |
+| `tmos <cfet\|dfet>` | Test selected MOSFET. | L:E | L:E | V |
 | `teepr` | EEPROM write/read test; E2 temporarily writes 0x55 at offset 0x26 on both chips, then restores it. | L:E | L:E | V |
-| `tflash` | External-flash test; exact modifications need review. | L:E | L:E | H |
-| `ti2c` | Run I2C test routine. | L:E | L:E | H |
+| `tflash` | Destructive sector-zero erase/program test; also clears record metadata. | L:E | L:E | V |
+| `ti2c` | Run I2C test routine. | L:E | L:E | V |
 | `tcan` | Run CAN test; help advertises port# but table rejects additional tokens. | L:E | L:E | H |
-| `tusart` | Run USART test routine. | L:E | L:E | H |
+| `tusart` | Run USART test routine. | L:E | L:E | V |
 | `tdip <expected>` | Compare DIP-switch state with a decimal value 0–15. | L:E | L:E | V |
-| `tled <selector> [on\|off]` | Test/control LEDs using selector 0, LED number or on/off per help. | L:E | L:E | H |
-| `tibcio <nc\|sc>` | Test IBC I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | H |
-| `tcbnio <nc\|sc>` | Test CBN I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | H |
+| `tled <selector> [on\|off]` | Test/control LEDs using selector 0, LED number or on/off per help. | L:E | L:E | V |
+| `tibcio <nc\|sc>` | Test IBC I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | V |
+| `tcbnio <nc\|sc>` | Test CBN I/O; nc/sc meanings are not expanded by firmware help. | L:E | L:E | V |
 | `tmprctrl <flag> [bat-id value]` | Inject runtime temperature or voltage by flag and selector; short form restores measurement flags. | L:D | L:D | V |
-| `tsto` | Test self-test output; C only. | — | L:E | H |
+| `tsto` | Report cached self-test faults; C only, no output drive. | — | L:E | V |
 | `tver <version>` | Compare hexadecimal value with actual software version; C only, does not set it. | — | L:E | V |
-| `tdct` | Run dry-contact test. | L:E | L:E | H |
-| `tbld` | Run bleeding/balancing test; help advertises val but table accepts no extra token. | L:E | L:E | H |
+| `tdct` | Run dry-contact test. | L:E | L:E | V |
+| `tbld` | Run bleeding/balancing test; help advertises val but table accepts no extra token. | L:E | L:E | V |
 | `twdg` | Stop feeding watchdog; help says wdg but only twdg is registered. | L:E | L:E | H |
-| `tagevolt` | Run aging-voltage test; C only. | — | L:E | H |
-| `trdagevolt` | Read recorded aging-voltage extrema/history. | L:E | L:E | H |
+| `tagevolt` | Run aging-voltage test; C only. | — | L:E | V |
+| `trdagevolt` | Read recorded aging-voltage extrema/history. | L:E | L:E | V |
 
 ## Routing, framing and implementation notes
 
@@ -237,8 +240,8 @@ The remote tables contain `config`, `ctrl`, `data`, `emptyvolt`, `info`, `login`
 `logout`, `prot`, `couls`, `soh`, `stat` and `statc`. **A remote-table entry alone
 does not guarantee direct-console invocation:** the inspected frontend first
 requires a local-table match. In particular, `couls` is remote-only in both
-images, and E2 `soh` is remote-only. Their transport entry paths need additional
-review before exposing them as ordinary local CLI commands.
+images, and E2 `soh` is remote-only. The reviewed E2 text frontend therefore rejects these names before their
+handlers run; no alternate public text spelling was found.
 
 `pwr [index]` and `getpwr [index]` have their own selection behavior and are not
 registered in the remote table. The E2 `getpwr` handler at `0x0800ef84` accepts
@@ -272,9 +275,10 @@ event history pov puv plv bov buv inputov coc coca doc doca sc use
 
 `data <kind> [item]` retrieves an individual/default item. The detailed-list
 handler recognizes `datalist <kind> dtls <item>` despite omitting `dtls` from
-help (E2 comparison at `0x0800ba8a`). Other advertised list selectors are
-`item`, `bat`, a battery number, and `volt/curr/temp/coul`. Their combinations
-need handler-specific validation before a generic query builder is implemented.
+help (E2 comparison at `0x0800ba8a`). Actual E2 field forms are `datalist kind bat field start` and
+`datalist kind bat cell field start`; `item` is not a recognized literal.
+The supplement records zero-based cell selection, current scaling differences
+and paging behavior.
 The `use` path can report its recording interval in days.
 
 Do not confuse event/history records with the separate internal `log` ring.
@@ -356,7 +360,8 @@ not that every argument combination will succeed.
 - **`statc`:** E2 clears 60 halfwords starting at module-structure offset
   `0x08c`, restores fields at `0x0ce`, `0x0de` and `0x0e0` (reset, life-warning
   and life-alarm counts), then calls the module's `+0x280` callback via
-  `0x080073dc`. Full persistence behavior of that callback needs further review.
+  `0x080073dc`. The resolved callback immediately attempts a 124-byte write to EEPROM 0
+  `0x38f`; the statc handler ignores the driver status.
   It does not preserve all statistics and is not an alias for `datac` or `eepe`.
 - **`logc`:** E2 zeros internal log index/wrap state and writes a two-byte count
   at EEPROM-0 offset `0x387`; that is bookkeeping clearing, not a proven erase
@@ -379,8 +384,9 @@ mentioned. Shared names/help do not establish identical hardware effects.
 - E2 contains `inar`, `inaw`, `inash`, `inacal` and `currcal`, with INA226 help.
   `inacal` and `currcal` have distinct handlers and different maximum token counts.
 - C contains `socr`, `socw`, `socsh`, `soccfg`, `soccal`, `socd`, `socclr`, `soct`
-  and `tsoc`, with bq34z100-related help. `socclr` describes clearing that gauge's
-  data flash and loading defaults; this is a separate storage target from `eepe`.
+  and `tsoc`, with bq34z100-related help. `socclr` actually invokes a recovered 182-step
+  embedded programming script, broader than a descriptor reset and separate
+  from `eepe`.
 - Other C-only names are `blocksoc`, `tagevolt`, `tpwr`, `tsoh`, `tsto` and `tver`.
 - E2 `tchgc` and `tdisc` allow three total tokens and advertise current/limit.
   C allows only two and its help omits the parameter meaning. Do not copy E2's
@@ -397,8 +403,9 @@ mentioned. Shared names/help do not establish identical hardware effects.
 
 ## Remaining work before implementation
 
-The [parameter reference](firmware-parameters.md) records the completed handler
-analysis and names the remaining gaps. Use the recorded handler addresses to
+The [parameter reference](firmware-parameters.md) and
+[handler supplement](firmware-behavior.md) record completed analysis and the
+remaining board/consumer/source limitations. Use the recorded handler addresses to
 establish unresolved parameter units, numeric bases,
 full accepted forms, persistence timing and per-model hardware behavior for each
 new write/test command. Identify operation-specific result messages and recovery
