@@ -1,25 +1,15 @@
-BatteryView controls and workflows
-==================================
+BatteryView command meanings and workflows
+==========================================
 
 .. _protocol-command-meanings-from-batteryviews-controls:
 
 Command meanings from BatteryView’s controls
 --------------------------------------------
 
-This section adds **application intent**, alongside the firmware contracts in
-:doc:`the parameter reference </protocol/index>`. Evidence is the managed code and bundled
-configuration in ``BatteryView_3.0.28_1``, not successful execution on every supported model.
-Reviewed ``BatteryView.exe`` SHA-256:
-``af69bbf5118856b5a72b07bd2d773a4565062ade3932c53cf9fc05205bcd45b6``. Method RVAs below identify
-this assembly, not MCU addresses.
-
-The relevant files under the application’s ``Configs/`` directory are ``ParameterConfig.xml``,
-``Params/*_ParameterConfig.xml``, ``CtrlConfig.xml``, ``Controls/*_CtrlConfig.xml``,
-``SetItem.xml``, ``Controls/*_SetItem.xml``, and ``Indicator.xml`` /
-``Indicators/*_Indicator.xml``. Labels describe intended use; ``CmdHeader`` / ``CmdBody``
-describe what the application constructs. Neither is proof that the reviewed E2/C firmware
-implements that spelling. Original logs, identities and telemetry were not used for this
-additional analysis.
+The tables below translate BatteryView's parameter labels and named actions into
+console commands. Use them to interpret support instructions or reproduce an
+application workflow. The firmware command contracts remain authoritative when
+an application label, XML definition, or constructed command disagrees with them.
 
 .. _protocol-parameter-vocabulary-and-units:
 
@@ -318,3 +308,21 @@ calibration, MOS-failure monitoring and model-specific UI actions. It also recor
 typos and the application’s collection-addressing bug. Those are application findings, separate
 from this catalog’s firmware registration evidence; do not treat every bundled script spelling
 as supported.
+
+Application source details
+--------------------------
+
+This section adds **application intent**, alongside the firmware contracts in
+:doc:`the command reference <commands>`. Evidence is the managed code and bundled
+configuration in ``BatteryView_3.0.28_1``, not successful execution on every supported model.
+Reviewed ``BatteryView.exe`` SHA-256:
+``af69bbf5118856b5a72b07bd2d773a4565062ade3932c53cf9fc05205bcd45b6``. Method RVAs in this chapter identify
+this assembly, not MCU addresses.
+
+The relevant files under the application’s ``Configs/`` directory are ``ParameterConfig.xml``,
+``Params/*_ParameterConfig.xml``, ``CtrlConfig.xml``, ``Controls/*_CtrlConfig.xml``,
+``SetItem.xml``, ``Controls/*_SetItem.xml``, and ``Indicator.xml`` /
+``Indicators/*_Indicator.xml``. Labels describe intended use; ``CmdHeader`` / ``CmdBody``
+describe what the application constructs. Neither is proof that the reviewed E2/C firmware
+implements that spelling. Original logs, identities and telemetry were not used for this
+additional analysis.

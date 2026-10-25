@@ -1,171 +1,14 @@
-SOC, fuel gauges and calibration
-================================
+Clock, SOC and fuel-gauge commands
+==================================
 
-.. _protocol-soc-reset-button:
+Use bare ``time`` to read the battery clock. SOC/capacity setters, sensor
+calibration, gauge programming, and the SOC-reset workflow are separate
+operations with different effects. A command that changes a displayed percentage
+is not interchangeable with clearing persistent state or recalibrating a sensor.
 
-SOC reset button
-----------------
-
-The user-defined-data button loads ``Script.xml`` and names its output ``resetsoc``.
-``OnGetUserData`` executes the following sequence:
-
-1.  ``stat`` (CR).
-2.  ``datalist event 0`` (LF), then CR+LF continuation until the console prompt.
-3.  ``datalist misc 0`` with the same continuation behavior.
-4.  ``datalist history 0`` with the same continuation behavior.
-5.  ``info`` (CR); capture its barcode for a subsequent command.
-6.  ``setlowcfg`` (CR).
-7.  ``eepe 0`` (CR).
-8.  ``trst`` (CR), waiting for ``pylon>``.
-9.  The ``login`` script pseudo-command runs console switching/reconnection. On success it
-    contributes no text to the report.
-10. ``login debug`` (CR).
-11. ``tbar ORIGINAL_BARCODE`` (CR).
-12. ``info`` (CR).
-13. ``setlowcfg`` (CR).
-
-``RetrieveHistoryData`` sends at least one CR+LF after each initial datalist reply, including
-empty and unsupported replies. The provided firmware rejects event and miscellaneous datalist
-commands in this script; those responses and their following prompts are retained. Ordinary
-report commands permit the specific detailed-list fallback described above; other rejections
-remain failures.
-
-The Python workflow additionally saves durable recovery information before clearing EEPROM,
-validates the barcode before mutation, and checks identity after restoration. It never retries
-``eepe``, ``trst``, or ``tbar`` automatically. It does not reselect the previous module address
-after reset, since a reset can change it. Failure after a mutating write requires inspection of
-the saved recovery state; there is no automatic resume command.
-
-.. _protocol-firmware-evidence-for-soc-reset:
-
-Firmware evidence for SOC reset
--------------------------------
-
-For all registered commands, access modes and per-image handler addresses, see the
-:doc:`firmware command reference </protocol/commands>`. The
-:ref:`handler supplement <firmware-behavior-what-the-persistence-callbacks-actually-do>`
-resolves immediate statistics/extended-state saves and record-write behavior.
-
-Static inspection of the user-supplied firmware archive now establishes the erase scope for two
-specific images. Neither firmware was executed or flashed. The archive also contains an updater
-and example update logs; none of those logs or firmware payloads are included in this
-repository.
-
-+---------------------------+-------------------------------------+----------------------------------------------------------------------+
-| Image                     | Bytes                               | SHA-256                                                              |
-+===========================+=====================================+======================================================================+
-| ``US_E2_V2.5_Crc.bin``    | 217088                              | ``897c3326ab8905df75a7297905112958a07c0a2cbb0592e0ecc274b886b0c82e`` |
-+---------------------------+-------------------------------------+----------------------------------------------------------------------+
-| ``US_C_V3.1_Crc.bin``     | 242688                              | ``5450e3bd884ae63549fc3b278ecccc0126227234f7148c7961542755cbad2d7d`` |
-+---------------------------+-------------------------------------+----------------------------------------------------------------------+
-
-Both are readable ARM Thumb images mapped at ``0x08003800``. The inferred base is supported by
-command-table string/function pointers and valid reset-vector code. Addresses below are runtime
-addresses; subtract the base to obtain file offsets. The E2 board tag at file offset ``0x418``
-is ``US2000C_NF4``; the other image’s tag is ``US2000C``. These findings establish behavior in
-these images, not automatically in every installed firmware revision.
-
-.. _protocol-erase-and-restart:
-
-Erase and restart
-~~~~~~~~~~~~~~~~~
-
-The command table describes ``eepe`` as ``EEPROM erase - eepe [chip]``. In E2 V2.5, the handler
-at ``0x08010410`` accepts logical chip 0 or 1 and calls ``0x080101ee``. That routine zeroes a
-16-byte buffer through ``0x08017dcc``, then writes that buffer 128 times at offsets ``i << 4``.
-Thus ``eepe 0`` attempts to overwrite **all 2048 bytes of logical EEPROM chip 0 with zero**,
-rather than clearing a single SOC field. Write statuses are combined for the command result. The
-driver at ``0x0801004a`` checks the 2048-byte boundary and handles page writes/readiness waits.
-
-C V3.1 has the same loop: handler ``0x080103dc``, erase routine ``0x08010142``, zero helper
-``0x08017c50``, and EEPROM write routine ``0x0800ffa2``. Erasing chip 0 does not itself erase
-chip 1, external history flash, or executable firmware. This is not a guarantee that restart
-will leave all other storage unchanged: startup routines also initialize and update persistent
-data.
-
-In E2 V2.5, ``trst`` at ``0x0802b024`` performs preparatory calls and ultimately invokes
-``0x0801719c``, then ``0x08016546``. The latter writes the AIRCR register at ``0xe000ed0c``,
-preserving priority grouping and adding ``0x05fa0004``: the keyed Cortex-M ``SYSRESETREQ``
-operation. This is a processor/system reset, not merely closing a console session. See `Arm’s
-reset documentation <https://arm-software.github.io/CMSIS_5/Core/html/group__NVIC__gr.html>`__.
-
-.. _protocol-confirmed-e2-persistent-fields:
-
-Confirmed E2 persistent fields
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The following addresses are **EEPROM byte offsets**, not firmware addresses. They are
-established by tracing both EEPROM reads/writes and the firmware’s labeled output. A cleared
-stored field may subsequently be recomputed or updated; this table does not assert that every
-displayed value remains zero after restart.
-
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| Chip                     | Offset            | Size                     | Evidence / meaning             |
-+==========================+===================+==========================+================================+
-| 0                        | ``0x021``         | 16                       | Barcode: ``tbar`` at           |
-|                          |                   |                          | ``0x0802b080`` writes it at    |
-|                          |                   |                          | ``0x0802b130`` and reads it    |
-|                          |                   |                          | back at ``0x0802b13c``. This   |
-|                          |                   |                          | explains BatteryView’s         |
-|                          |                   |                          | explicit barcode restoration.  |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| 0                        | ``0x38f``         | 124                      | Saved statistics block:        |
-|                          |                   |                          | startup reads it into the      |
-|                          |                   |                          | per-module structure at        |
-|                          |                   |                          | ``+0x88`` through              |
-|                          |                   |                          | ``0x08012654``–``0x0801265e``; |
-|                          |                   |                          | ``stat`` at ``0x08008a60``     |
-|                          |                   |                          | labels its fields.             |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| 0                        | ``0x38f`` /       | 2 each                   | Event/history item counts in   |
-|                          | ``0x391``         |                          | that block. Clearing these     |
-|                          |                   |                          | affects record bookkeeping     |
-|                          |                   |                          | even though the erase handler  |
-|                          |                   |                          | does not erase the external    |
-|                          |                   |                          | log payloads.                  |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| 0                        | ``0x39f``         | 2                        | Saved ``Pwr Percent``, read    |
-|                          |                   |                          | for ``stat`` at                |
-|                          |                   |                          | ``0x08008c9e``.                |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| 0                        | ``0x3a1``         | 4                        | Saved ``Pwr Coulomb``,         |
-|                          |                   |                          | reconstructed from two         |
-|                          |                   |                          | halfwords at                   |
-|                          |                   |                          | ``0x08008caa``–``0x08008cae``. |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| 0                        | ``0x3df``         | 2                        | Cycle-count field, displayed   |
-|                          |                   |                          | as ``CYCLE Times`` at          |
-|                          |                   |                          | ``0x08008c82``–``0x08008c90``  |
-|                          |                   |                          | after masking its high bit.    |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| 0                        | ``0x3ef``         | 4                        | Discharge-capacity             |
-|                          |                   |                          | accumulator, labeled           |
-|                          |                   |                          | ``Dsg Cap`` at                 |
-|                          |                   |                          | ``0x08008cbe``–``0x08008cca``. |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-| 1                        | ``0x021``         | 8                        | Configured nominal capacity,   |
-|                          |                   |                          | read by ``totalcoul`` at       |
-|                          |                   |                          | ``0x08029f5e``–``0x08029f80``; |
-|                          |                   |                          | its check byte is at           |
-|                          |                   |                          | ``0x029``. Startup validates   |
-|                          |                   |                          | the supported capacity         |
-|                          |                   |                          | constants and falls back to a  |
-|                          |                   |                          | default if invalid. This is    |
-|                          |                   |                          | separate from chip-0           |
-|                          |                   |                          | SOC/counter storage.           |
-+--------------------------+-------------------+--------------------------+--------------------------------+
-
-The erased statistics block also contains charge/discharge and fault counters. Chip 0 holds
-additional metadata/settings, so this procedure should be described as clearing a persistence
-area used by SOC and diagnostics, not a narrowly scoped percentage reset. There is a separate
-``setsoc`` command in both command tables; the bundled BatteryView reset script does not call
-it.
-
-The evidence explains why the procedure can discard stale SOC/coulomb state and why support
-wants reports beforehand. It does **not** yet establish the exact post-reset SOC reconstruction
-algorithm, whether every parameter or calibration value survives, whether log records can be
-recovered after their bookkeeping is cleared, or why support requested the reset for a
-particular module. Those need further firmware analysis and/or manufacturer confirmation.
+Check the firmware family before using gauge commands: E2 uses the INA226 path,
+while C uses the bq34z100 path. The sections below give accepted arguments, units,
+write locations, completion conditions, and limitations for each.
 
 .. _firmware-parameters-soc-capacity-and-small-configuration-settings:
 
@@ -222,9 +65,11 @@ SOC, capacity and small configuration settings
 |                                               | persistent saving.                            |
 +-----------------------------------------------+-----------------------------------------------+
 
-Evidence: E2 ``setsoc`` ``0x0800fbd0``, ``setlowcfg`` ``0x0800fc58``, ``totalcoul``
-``0x08029f10``. For erase/restart and the persistent field map see
-:ref:`SOC-reset analysis <protocol-firmware-evidence-for-soc-reset>`.
+.. admonition:: Firmware evidence
+
+   Evidence: E2 ``setsoc`` ``0x0800fbd0``, ``setlowcfg`` ``0x0800fc58``, ``totalcoul``
+   ``0x08029f10``. For erase/restart and the persistent field map see
+   :ref:`SOC-reset analysis <protocol-firmware-evidence-for-soc-reset>`.
 
 .. _firmware-parameters-rtc-and-manufacturing-timestamp:
 
@@ -380,6 +225,31 @@ C bq34z100 path
 
 C ``soccfg`` ``0x080208d4``, descriptor lookup ``0x08020ae6``–``0x08020b56``; ``socclr`` calls
 ``0x080202ec``. Gauge data flash is separate from either ``eepe`` chip.
+
+.. _firmware-behavior-gauge-report-scaling-c:
+
+Gauge report scaling (C)
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The driver initializer at ``0x08022444`` passes **4** to ``0x080203a8``, which stores that byte
+at ``0x20000b48`` while installing bus callbacks. ``socd`` then uses:
+
+=================== ===============================================================
+Gauge register      Decoding / reported value
+=================== ===============================================================
+``0x08``, two bytes Little-endian unsigned pack voltage, mV, no multiplier.
+``0x10``, two bytes Little-endian **signed 16-bit** current multiplied by 4, mA.
+``0x02``, one byte  SOC percent, no multiplier.
+``0x04``, two bytes Little-endian unsigned remaining capacity multiplied by 4, mAh.
+=================== ===============================================================
+
+.. admonition:: Firmware evidence
+
+   Evidence: handler ``0x0802117a``–``0x08021204``, initializer ``0x08022456``–``0x08022462``,
+   scale store ``0x080203c0``. This is the initialized scale for the reviewed C image, not a
+   universal bq34z100 convention or a detected value from the connected battery. ``socd`` does not
+   check each bus-read return before formatting the result; a successful console footer alone does
+   not prove all four measurements were read successfully.
 
 .. _firmware-behavior-c-gauge-data-flash-types:
 
@@ -580,8 +450,8 @@ cleanup on every path.
 
 .. _firmware-behavior-additional-e2-calibration-and-soc-consumers:
 
-Additional E2 calibration and SOC consumers
--------------------------------------------
+E2 current scaling and SOC recovery
+-----------------------------------
 
 INA initialization at ``0x080214b2`` installs calibration callback **``0x080215f8``**. Its
 operations resolve the previously opaque ``currcal`` calls:
@@ -623,38 +493,172 @@ current RTC time.
 Monitor-read count bounds
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-E2 ``bmicrdcfg`` allocates a **16-byte caller buffer**. Its reader at ``0x0801564e`` receives
-and copies **eight bytes per IC** (six data plus two check bytes) into that buffer. No caller
-limit guards the count: **copying three or more ICs overflows the command’s buffer**. The
-driver’s own receive buffer is 256 bytes, providing a second insufficient bound for unrestricted
-counts.
+For ``bmicrdcfg`` receive-buffer bounds and physical monitor-IC selection, see
+:ref:`Monitor IC read limits <protocol-monitor-ic-read-limits>`. These hardware
+read limits are separate from the fuel-gauge report scaling above.
 
-``bmicrdcomm`` uses the same 16-byte caller allocation and an analogous count-based reader. The
-count is narrowed to u8 only after a setup call using the full parsed value. Thus these are not
-safe “arbitrary count” diagnostics; a future client must restrict count to the board’s actual
-monitor configuration and no more than **two** for these handlers. This is a software buffer
-bound, not evidence that every supported board physically has two ICs. It resolves the
-handler/driver limit without requiring a live overflow probe.
+.. _protocol-soc-reset-button:
 
-.. _firmware-behavior-gauge-report-scaling-c:
+SOC-reset workflow
+------------------
 
-Gauge report scaling (C)
-~~~~~~~~~~~~~~~~~~~~~~~~
+The user-defined-data button loads ``Script.xml`` and names its output ``resetsoc``.
+``OnGetUserData`` executes the following sequence:
 
-The driver initializer at ``0x08022444`` passes **4** to ``0x080203a8``, which stores that byte
-at ``0x20000b48`` while installing bus callbacks. ``socd`` then uses:
+1.  ``stat`` (CR).
+2.  ``datalist event 0`` (LF), then CR+LF continuation until the console prompt.
+3.  ``datalist misc 0`` with the same continuation behavior.
+4.  ``datalist history 0`` with the same continuation behavior.
+5.  ``info`` (CR); capture its barcode for a subsequent command.
+6.  ``setlowcfg`` (CR).
+7.  ``eepe 0`` (CR).
+8.  ``trst`` (CR), waiting for ``pylon>``.
+9.  The ``login`` script pseudo-command runs console switching/reconnection. On success it
+    contributes no text to the report.
+10. ``login debug`` (CR).
+11. ``tbar ORIGINAL_BARCODE`` (CR).
+12. ``info`` (CR).
+13. ``setlowcfg`` (CR).
 
-=================== ===============================================================
-Gauge register      Decoding / reported value
-=================== ===============================================================
-``0x08``, two bytes Little-endian unsigned pack voltage, mV, no multiplier.
-``0x10``, two bytes Little-endian **signed 16-bit** current multiplied by 4, mA.
-``0x02``, one byte  SOC percent, no multiplier.
-``0x04``, two bytes Little-endian unsigned remaining capacity multiplied by 4, mAh.
-=================== ===============================================================
+``RetrieveHistoryData`` sends at least one CR+LF after each initial datalist reply, including
+empty and unsupported replies. The provided firmware rejects event and miscellaneous datalist
+commands in this script; those responses and their following prompts are retained. Ordinary
+report commands permit the specific detailed-list fallback described above; other rejections
+remain failures.
 
-Evidence: handler ``0x0802117a``–``0x08021204``, initializer ``0x08022456``–``0x08022462``,
-scale store ``0x080203c0``. This is the initialized scale for the reviewed C image, not a
-universal bq34z100 convention or a detected value from the connected battery. ``socd`` does not
-check each bus-read return before formatting the result; a successful console footer alone does
-not prove all four measurements were read successfully.
+The Python workflow additionally saves durable recovery information before clearing EEPROM,
+validates the barcode before mutation, and checks identity after restoration. It never retries
+``eepe``, ``trst``, or ``tbar`` automatically. It does not reselect the previous module address
+after reset, since a reset can change it. Failure after a mutating write requires inspection of
+the saved recovery state; there is no automatic resume command.
+
+.. _protocol-firmware-evidence-for-soc-reset:
+
+SOC-reset erase scope and persistent state
+------------------------------------------
+
+For all registered commands, access modes and per-image handler addresses, see the
+:doc:`firmware command reference </protocol/commands>`. The
+:ref:`handler supplement <firmware-behavior-what-the-persistence-callbacks-actually-do>`
+resolves immediate statistics/extended-state saves and record-write behavior.
+
+Static inspection of the user-supplied firmware archive now establishes the erase scope for two
+specific images. Neither firmware was executed or flashed. The archive also contains an updater
+and example update logs; none of those logs or firmware payloads are included in this
+repository.
+
++---------------------------+-------------------------------------+----------------------------------------------------------------------+
+| Image                     | Bytes                               | SHA-256                                                              |
++===========================+=====================================+======================================================================+
+| ``US_E2_V2.5_Crc.bin``    | 217088                              | ``897c3326ab8905df75a7297905112958a07c0a2cbb0592e0ecc274b886b0c82e`` |
++---------------------------+-------------------------------------+----------------------------------------------------------------------+
+| ``US_C_V3.1_Crc.bin``     | 242688                              | ``5450e3bd884ae63549fc3b278ecccc0126227234f7148c7961542755cbad2d7d`` |
++---------------------------+-------------------------------------+----------------------------------------------------------------------+
+
+Both are readable ARM Thumb images mapped at ``0x08003800``. The inferred base is supported by
+command-table string/function pointers and valid reset-vector code. Addresses below are runtime
+addresses; subtract the base to obtain file offsets. The E2 board tag at file offset ``0x418``
+is ``US2000C_NF4``; the other image’s tag is ``US2000C``. These findings establish behavior in
+these images, not automatically in every installed firmware revision.
+
+.. _protocol-erase-and-restart:
+
+Erase and restart
+~~~~~~~~~~~~~~~~~
+
+The command table describes ``eepe`` as ``EEPROM erase - eepe [chip]``. In E2 V2.5, the handler
+at ``0x08010410`` accepts logical chip 0 or 1 and calls ``0x080101ee``. That routine zeroes a
+16-byte buffer through ``0x08017dcc``, then writes that buffer 128 times at offsets ``i << 4``.
+Thus ``eepe 0`` attempts to overwrite **all 2048 bytes of logical EEPROM chip 0 with zero**,
+rather than clearing a single SOC field. Write statuses are combined for the command result. The
+driver at ``0x0801004a`` checks the 2048-byte boundary and handles page writes/readiness waits.
+
+C V3.1 has the same loop: handler ``0x080103dc``, erase routine ``0x08010142``, zero helper
+``0x08017c50``, and EEPROM write routine ``0x0800ffa2``. Erasing chip 0 does not itself erase
+chip 1, external history flash, or executable firmware. This is not a guarantee that restart
+will leave all other storage unchanged: startup routines also initialize and update persistent
+data.
+
+In E2 V2.5, ``trst`` at ``0x0802b024`` performs preparatory calls and ultimately invokes
+``0x0801719c``, then ``0x08016546``. The latter writes the AIRCR register at ``0xe000ed0c``,
+preserving priority grouping and adding ``0x05fa0004``: the keyed Cortex-M ``SYSRESETREQ``
+operation. This is a processor/system reset, not merely closing a console session. See `Arm’s
+reset documentation <https://arm-software.github.io/CMSIS_5/Core/html/group__NVIC__gr.html>`__.
+
+.. _protocol-confirmed-e2-persistent-fields:
+
+Confirmed E2 persistent fields
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following addresses are **EEPROM byte offsets**, not firmware addresses. They are
+established by tracing both EEPROM reads/writes and the firmware’s labeled output. A cleared
+stored field may subsequently be recomputed or updated; this table does not assert that every
+displayed value remains zero after restart.
+
++--------------------------+-------------------+--------------------------+--------------------------------+
+| Chip                     | Offset            | Size                     | Evidence / meaning             |
++==========================+===================+==========================+================================+
+| 0                        | ``0x021``         | 16                       | Barcode: ``tbar`` at           |
+|                          |                   |                          | ``0x0802b080`` writes it at    |
+|                          |                   |                          | ``0x0802b130`` and reads it    |
+|                          |                   |                          | back at ``0x0802b13c``. This   |
+|                          |                   |                          | explains BatteryView’s         |
+|                          |                   |                          | explicit barcode restoration.  |
++--------------------------+-------------------+--------------------------+--------------------------------+
+| 0                        | ``0x38f``         | 124                      | Saved statistics block:        |
+|                          |                   |                          | startup reads it into the      |
+|                          |                   |                          | per-module structure at        |
+|                          |                   |                          | ``+0x88`` through              |
+|                          |                   |                          | ``0x08012654``–``0x0801265e``; |
+|                          |                   |                          | ``stat`` at ``0x08008a60``     |
+|                          |                   |                          | labels its fields.             |
++--------------------------+-------------------+--------------------------+--------------------------------+
+| 0                        | ``0x38f`` /       | 2 each                   | Event/history item counts in   |
+|                          | ``0x391``         |                          | that block. Clearing these     |
+|                          |                   |                          | affects record bookkeeping     |
+|                          |                   |                          | even though the erase handler  |
+|                          |                   |                          | does not erase the external    |
+|                          |                   |                          | log payloads.                  |
++--------------------------+-------------------+--------------------------+--------------------------------+
+| 0                        | ``0x39f``         | 2                        | Saved ``Pwr Percent``, read    |
+|                          |                   |                          | for ``stat`` at                |
+|                          |                   |                          | ``0x08008c9e``.                |
++--------------------------+-------------------+--------------------------+--------------------------------+
+| 0                        | ``0x3a1``         | 4                        | Saved ``Pwr Coulomb``,         |
+|                          |                   |                          | reconstructed from two         |
+|                          |                   |                          | halfwords at                   |
+|                          |                   |                          | ``0x08008caa``–``0x08008cae``. |
++--------------------------+-------------------+--------------------------+--------------------------------+
+| 0                        | ``0x3df``         | 2                        | Cycle-count field, displayed   |
+|                          |                   |                          | as ``CYCLE Times`` at          |
+|                          |                   |                          | ``0x08008c82``–``0x08008c90``  |
+|                          |                   |                          | after masking its high bit.    |
++--------------------------+-------------------+--------------------------+--------------------------------+
+| 0                        | ``0x3ef``         | 4                        | Discharge-capacity             |
+|                          |                   |                          | accumulator, labeled           |
+|                          |                   |                          | ``Dsg Cap`` at                 |
+|                          |                   |                          | ``0x08008cbe``–``0x08008cca``. |
++--------------------------+-------------------+--------------------------+--------------------------------+
+| 1                        | ``0x021``         | 8                        | Configured nominal capacity,   |
+|                          |                   |                          | read by ``totalcoul`` at       |
+|                          |                   |                          | ``0x08029f5e``–``0x08029f80``; |
+|                          |                   |                          | its check byte is at           |
+|                          |                   |                          | ``0x029``. Startup validates   |
+|                          |                   |                          | the supported capacity         |
+|                          |                   |                          | constants and falls back to a  |
+|                          |                   |                          | default if invalid. This is    |
+|                          |                   |                          | separate from chip-0           |
+|                          |                   |                          | SOC/counter storage.           |
++--------------------------+-------------------+--------------------------+--------------------------------+
+
+The erased statistics block also contains charge/discharge and fault counters. Chip 0 holds
+additional metadata/settings, so this procedure should be described as clearing a persistence
+area used by SOC and diagnostics, not a narrowly scoped percentage reset. There is a separate
+``setsoc`` command in both command tables; the bundled BatteryView reset script does not call
+it.
+
+The evidence explains why the procedure can discard stale SOC/coulomb state and why support
+wants reports beforehand. It does **not** yet establish the exact post-reset SOC reconstruction
+algorithm, whether every parameter or calibration value survives, whether log records can be
+recovered after their bookkeeping is cleared, or why support requested the reset for a
+particular module. Those need further firmware analysis and/or manufacturer confirmation.

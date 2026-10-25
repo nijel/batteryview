@@ -1,95 +1,14 @@
 Records, reports and pagination
 ===============================
 
-.. _protocol-report-writer:
+Use ``stat`` to read record counts, ``data`` to retrieve one record, and
+``datalist`` to enumerate records. Record indices are zero-based. ``log`` reads a
+separate diagnostic ring; it is not an alias for ``data event``. The command
+contracts below distinguish reads from record creation and clearing.
 
-Report writer
--------------
-
-``DataStorage.SaveLogDataToTxt`` opens a new or appended file and constructs a ``StreamWriter``
-with ``Encoding.Unicode``, then calls ``WriteLine(response)``. On Windows this yields:
-
-- One UTF-16LE BOM at the beginning of the file.
-- The response text exactly as accumulated from the console.
-- An additional CRLF after each saved response.
-
-The Python writer emits those bytes explicitly on every platform, flushes after each response,
-and exclusively creates output files to prevent accidental mixing of sessions. It does not
-prepend commands: command echoes come from the console itself. Recovery metadata is a separate
-UTF-8 JSON file.
-
-The History/Event button handlers append ``.txt`` to the selected filename, explaining
-``.txt.txt`` in the supplied reports. The reset button embeds a space in ``_resetsoc _``; both
-quirks are retained in generated default filenames.
-
-.. _protocol-history-and-event-buttons:
-
-History and Event buttons
--------------------------
-
-1. Save ``info``, ``stat``, then ``data history`` or ``data event``.
-2. The original uses the latest ``Item Index + 1`` as its count. Python does the same and falls
-   back to a valid ``stat`` counter when that index is absent. Disagreements are logged; an
-   indeterminate count is an error.
-3. For offsets ``0, 15, 30, ...``, try ``datalist KIND dtls OFFSET``.
-4. Explicit rejection switches to ``datalist KIND OFFSET``, at the same offset.
-5. After each page, save the response to a blank LF, including the final page.
-6. In fallback mode, save ``data KIND INDEX`` for each record on the page.
-
-The original’s ``RegoutHistoryData`` changes ``HistoryGetInfo.DtlsMode`` on rejection;
-``OnGetHistoryData`` and ``OnGetHistoryDataItem`` implement both formats for both kinds. The
-original always queues 15 individual reads on the last page, even beyond the count. Python
-bounds those reads and verifies each returned index instead.
-
-Detailed pages are checked for ordered record coverage. Some firmware includes a sixteenth
-record overlapping the next page; that boundary overlap is accepted. Other missing, repeated or
-unexpected indices fail collection and preserve partial output. The private historical History
-capture has three missing records, so it is now a negative completeness reference rather than
-proof of a complete export. No response text is reconstructed or modified to repair it. Unknown
-columns and firmware-specific fields remain intact in raw transcripts.
-
-Full reports and SOC reset reject addressed selection before any operation. The original uses
-explicit addressed identity/history-item commands in separate UI paths; numbered login is a
-parameter/protection authorization helper, not a verified redirection mechanism for bare report
-commands.
-
-.. _protocol-support-collection-wrapper:
-
-Support collection wrapper
---------------------------
-
-``collect`` reuses the identity, History, Event, and snapshot operations in that order, holding
-the session lock across the run. It uses the same History/Event command selection and UTF-16
-serialization as standalone exports, including repeated ``info``/``stat`` requests. Normal
-disconnect runs afterward and remains outside report content.
-
-The wrapper supports repeated physical connections to different modules with one shared flat
-output directory. Complete support exports routed to a remote module have not been verified.
-Consequently, ``collect`` rejects addressed module selection; the existing monitoring and
-standalone command interfaces remain available.
-
-Each invocation reserves its own manifest using a UTC timestamp and UUID-based run ID. JSON
-artifacts share that run ID, while transcripts keep their existing barcode/timestamp filenames.
-Exclusive artifact creation prevents replacement of earlier files, and manifest references never
-claim a colliding report from an earlier run as this run’s partial output.
-
-Manifest format version 1 records the application version, run ID, start/end times, overall
-status/completeness, device identity, and ordered step records. Step records contain a name,
-status, relative artifact filename, reported record count where available, and failure
-type/message. Status transitions are ``pending`` → ``running`` → ``complete``, ``failed``, or
-``interrupted``; later steps become ``skipped`` after a failure or interruption. Updates replace
-the run’s manifest atomically.
-
-The first failed step ends collection. By default reads are not retried; ``read_retries=1`` or
-``2`` enables bounded recovery of explicit reads after a debug prompt is verified. Pagination
-continuations and reset operations are never retried. Failed report attempts and
-resynchronization replies remain in reports. Existing artifacts remain available, and
-read-response payloads are not copied into manifest errors. The CLI prints an escaped, bounded
-response tail from the failed exchange, including failures returned inside collection; that
-diagnostic can contain private data. Successful raw traffic remains opt-in. Expected operational
-failures return an incomplete collection result; interruption is re-raised after finalization.
-Fatal manifest I/O failures are raised and can leave the last valid manifest indicating an
-unfinished run. Serial packet traces are only produced when explicitly enabled.
+For a complete export, follow the :ref:`History and Event sequence
+<protocol-history-and-event-buttons>`, including pagination and per-record
+fallback. A prompt ends an exchange, not necessarily the entire collection.
 
 .. _firmware-parameters-recorded-data-logs-and-counters:
 
@@ -180,10 +99,12 @@ Supported record kinds advertised by the firmware are ``event``, ``history``, ``
 The ``use`` path also reports an interval in days. Internal ``log`` is a different ring from
 these recorded-data collections.
 
-Evidence: E2 ``data`` ``0x080092f8`` (default/index logic ``0x08009324``–``0x080093e0``),
-``datalist`` comparison ``0x0800ba8a``, ``log`` ``0x080175b8``, ``logc`` ``0x08017794``,
-``statc`` ``0x08009036``, ``tcycle`` ``0x0800f32c``. C ``statc`` ``0x08008ff0`` has the same
-preservation pattern.
+.. admonition:: Firmware evidence
+
+   Evidence: E2 ``data`` ``0x080092f8`` (default/index logic ``0x08009324``–``0x080093e0``),
+   ``datalist`` comparison ``0x0800ba8a``, ``log`` ``0x080175b8``, ``logc`` ``0x08017794``,
+   ``statc`` ``0x08009036``, ``tcycle`` ``0x0800f32c``. C ``statc`` ``0x08008ff0`` has the same
+   preservation pattern.
 
 .. _firmware-parameters-datac-bookkeeping-and-payload-erasure-are-different-operations:
 
@@ -293,3 +214,94 @@ The summary/detail start parsers do not consistently test their error flag befor
 value. Supply strictly validated decimal tokens. The explicit field forms do test the flag.
 Evidence: E2 summary ``0x0800b17e``, detailed ``0x0800ba84``, all-cell ``0x0800c148``,
 single-cell ``0x0800c2b8``.
+
+.. _protocol-history-and-event-buttons:
+
+History and Event export sequence
+---------------------------------
+
+1. Save ``info``, ``stat``, then ``data history`` or ``data event``.
+2. The original uses the latest ``Item Index + 1`` as its count. Python does the same and falls
+   back to a valid ``stat`` counter when that index is absent. Disagreements are logged; an
+   indeterminate count is an error.
+3. For offsets ``0, 15, 30, ...``, try ``datalist KIND dtls OFFSET``.
+4. Explicit rejection switches to ``datalist KIND OFFSET``, at the same offset.
+5. After each page, save the response to a blank LF, including the final page.
+6. In fallback mode, save ``data KIND INDEX`` for each record on the page.
+
+The original’s ``RegoutHistoryData`` changes ``HistoryGetInfo.DtlsMode`` on rejection;
+``OnGetHistoryData`` and ``OnGetHistoryDataItem`` implement both formats for both kinds. The
+original always queues 15 individual reads on the last page, even beyond the count. Python
+bounds those reads and verifies each returned index instead.
+
+Detailed pages are checked for ordered record coverage. Some firmware includes a sixteenth
+record overlapping the next page; that boundary overlap is accepted. Other missing, repeated or
+unexpected indices fail collection and preserve partial output. The private historical History
+capture has three missing records, so it is now a negative completeness reference rather than
+proof of a complete export. No response text is reconstructed or modified to repair it. Unknown
+columns and firmware-specific fields remain intact in raw transcripts.
+
+Full reports and SOC reset reject addressed selection before any operation. The original uses
+explicit addressed identity/history-item commands in separate UI paths; numbered login is a
+parameter/protection authorization helper, not a verified redirection mechanism for bare report
+commands.
+
+.. _protocol-report-writer:
+
+Compatible transcript encoding
+------------------------------
+
+A BatteryView-compatible transcript uses the following serialization. The original
+``DataStorage.SaveLogDataToTxt`` opens a new or appended file and constructs a ``StreamWriter``
+with ``Encoding.Unicode``, then calls ``WriteLine(response)``. On Windows this yields:
+
+- One UTF-16LE BOM at the beginning of the file.
+- The response text exactly as accumulated from the console.
+- An additional CRLF after each saved response.
+
+The Python writer emits those bytes explicitly on every platform, flushes after each response,
+and exclusively creates output files to prevent accidental mixing of sessions. It does not
+prepend commands: command echoes come from the console itself. Recovery metadata is a separate
+UTF-8 JSON file.
+
+The History/Event button handlers append ``.txt`` to the selected filename, explaining
+``.txt.txt`` in the supplied reports. The reset button embeds a space in ``_resetsoc _``; both
+quirks are retained in generated default filenames.
+
+.. _protocol-support-collection-wrapper:
+
+Support bundle sequencing
+-------------------------
+
+``collect`` reuses the identity, History, Event, and snapshot operations in that order, holding
+the session lock across the run. It uses the same History/Event command selection and UTF-16
+serialization as standalone exports, including repeated ``info``/``stat`` requests. Normal
+disconnect runs afterward and remains outside report content.
+
+The wrapper supports repeated physical connections to different modules with one shared flat
+output directory. Complete support exports routed to a remote module have not been verified.
+Consequently, ``collect`` rejects addressed module selection; the existing monitoring and
+standalone command interfaces remain available.
+
+Each invocation reserves its own manifest using a UTC timestamp and UUID-based run ID. JSON
+artifacts share that run ID, while transcripts keep their existing barcode/timestamp filenames.
+Exclusive artifact creation prevents replacement of earlier files, and manifest references never
+claim a colliding report from an earlier run as this run’s partial output.
+
+Manifest format version 1 records the application version, run ID, start/end times, overall
+status/completeness, device identity, and ordered step records. Step records contain a name,
+status, relative artifact filename, reported record count where available, and failure
+type/message. Status transitions are ``pending`` → ``running`` → ``complete``, ``failed``, or
+``interrupted``; later steps become ``skipped`` after a failure or interruption. Updates replace
+the run’s manifest atomically.
+
+The first failed step ends collection. By default reads are not retried; ``read_retries=1`` or
+``2`` enables bounded recovery of explicit reads after a debug prompt is verified. Pagination
+continuations and reset operations are never retried. Failed report attempts and
+resynchronization replies remain in reports. Existing artifacts remain available, and
+read-response payloads are not copied into manifest errors. The CLI prints an escaped, bounded
+response tail from the failed exchange, including failures returned inside collection; that
+diagnostic can contain private data. Successful raw traffic remains opt-in. Expected operational
+failures return an incomplete collection result; interruption is re-raised after finalization.
+Fatal manifest I/O failures are raised and can leave the last valid manifest indicating an
+unfinished run. Serial packet traces are only produced when explicitly enabled.

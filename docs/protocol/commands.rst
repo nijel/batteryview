@@ -1,10 +1,52 @@
-Firmware command inventory
-==========================
+Command reference
+=================
+
+Look up a command's access mode and availability here, then use the topic chapter
+for its complete parameter and response contract. No-argument forms can be reads,
+errors, or actions depending on the command; do not infer that a bare name is safe.
+E2 and C identify the firmware revisions defined in :doc:`index`.
+
+The :download:`command metadata </firmware-commands.json>` retains exact help,
+token ceilings, local/remote entries, and handler addresses. Extraction details
+and hashes are in :doc:`research`.
+
+.. _firmware-parameters-reading-the-contracts:
+
+Syntax, units and result conventions
+------------------------------------
+
+- ``D``: unsigned decimal; ``S``: signed decimal; ``H``: hexadecimal, with an optional
+  ``0x``/``0X`` prefix. Bare ``10`` means sixteen in an H parameter and ten in a D parameter.
+- ``[argument]`` is optional. Values in braces are literal choices. Commands and selectors are
+  case-sensitive string comparisons unless stated otherwise.
+- ``u8``/``u16`` describe firmware truncation to 8/16 bits, **not a recommended input range**. A
+  client should reject overflow instead of reproducing it.
+- Storage addresses are byte offsets on the named logical chip. A direct EEPROM write is
+  persistent; a runtime update alone does not prove either persistence or loss on reboot because
+  other tasks can save state later.
+- A successful console footer only means the handler returned zero. Several tests and drivers
+  print failure and still return zero. Preserve their output and interpret the
+  operation-specific result.
+
+.. admonition:: Firmware evidence
+
+   The E2 unsigned conversion routine is ``0x08019d2e``: it checks digits against the requested
+   base, accumulates a 32-bit value, and reports invalid/trailing input through a caller-provided
+   error pointer. It rejects nine or more digits after stripping an optional hexadecimal prefix.
+   The signed wrapper at ``0x08019e08`` recognizes a leading minus. Some callers do not provide
+   robust error handling; validate complete tokens, signs, lengths and bounds before sending them.
+   Do not use malformed inputs to discover firmware limits.
+
+The table’s token ceiling includes the command word. It does not establish a minimum: some
+storage handlers load missing operands without checking them. Remote addressing is a frontend
+operation: for eligible commands, ``command N ...`` can remove decimal module address N before
+the handler sees the remaining arguments. The forms here describe those **remaining handler
+arguments**.
 
 .. _firmware-commands-notation-and-dispatch-rules:
 
-Notation and dispatch rules
----------------------------
+Access modes and command availability
+-------------------------------------
 
 ``L`` means registered in the local table; ``R`` means registered in the remote table. ``—``
 means absent from that image’s command tables. A local and a remote entry can have different
@@ -40,8 +82,8 @@ left unresolved.
 
 .. _firmware-commands-command-inventory:
 
-Command inventory
------------------
+Commands by function
+--------------------
 
 .. _firmware-commands-session-and-communications:
 
@@ -623,34 +665,3 @@ Manufacturing and hardware tests
 |                                        | aging-voltage      |                  |                  |                  |
 |                                        | extrema/history.   |                  |                  |                  |
 +----------------------------------------+--------------------+------------------+------------------+------------------+
-
-.. _firmware-parameters-reading-the-contracts:
-
-Reading the contracts
----------------------
-
-- ``D``: unsigned decimal; ``S``: signed decimal; ``H``: hexadecimal, with an optional
-  ``0x``/``0X`` prefix. Bare ``10`` means sixteen in an H parameter and ten in a D parameter.
-- ``[argument]`` is optional. Values in braces are literal choices. Commands and selectors are
-  case-sensitive string comparisons unless stated otherwise.
-- ``u8``/``u16`` describe firmware truncation to 8/16 bits, **not a recommended input range**. A
-  client should reject overflow instead of reproducing it.
-- Storage addresses are byte offsets on the named logical chip. A direct EEPROM write is
-  persistent; a runtime update alone does not prove either persistence or loss on reboot because
-  other tasks can save state later.
-- A successful console footer only means the handler returned zero. Several tests and drivers
-  print failure and still return zero. Preserve their output and interpret the
-  operation-specific result.
-
-The E2 unsigned conversion routine is ``0x08019d2e``: it checks digits against the requested
-base, accumulates a 32-bit value, and reports invalid/trailing input through a caller-provided
-error pointer. It rejects nine or more digits after stripping an optional hexadecimal prefix.
-The signed wrapper at ``0x08019e08`` recognizes a leading minus. Some callers do not provide
-robust error handling; validate complete tokens, signs, lengths and bounds before sending them.
-Do not use malformed inputs to discover firmware limits.
-
-The table’s token ceiling includes the command word. It does not establish a minimum: some
-storage handlers load missing operands without checking them. Remote addressing is a frontend
-operation: for eligible commands, ``command N ...`` can remove decimal module address N before
-the handler sees the remaining arguments. The forms here describe those **remaining handler
-arguments**.

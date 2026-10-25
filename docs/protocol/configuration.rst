@@ -1,6 +1,16 @@
 Configuration, protection and controls
 ======================================
 
+``config`` displays configuration; many ``config key`` forms read one setting,
+while ``config key value`` changes runtime state. ``prot`` and ``ctrl`` operate
+on protection and control settings. The exact forms below define exceptions,
+related-field constraints, persistence, and immediate effects.
+
+Values use the units stated for each selector. Firmware acceptance conditions
+are not recommended operating settings. Validate complete numeric tokens and
+cross-field relationships before sending a write; do not reproduce narrowing,
+signedness, or missing-bound checks from the firmware.
+
 .. _firmware-parameters-protection-configuration-and-control:
 
 Protection configuration and control
@@ -17,10 +27,12 @@ so negative current/temperature values are meaningful. Numeric parsing is attemp
 selector-specific string branches; a robust client must validate the intended form rather than
 use the parser’s permissiveness.
 
-E2 dispatch is at ``0x0800cc14``, using the selector order retained in JSON. Threshold branches
-validate against **other current settings**, not just fixed minimum/maximum constants. The
-following pack/cell-voltage bounds are taken from the comparisons, including endpoint
-strictness:
+.. admonition:: Firmware evidence
+
+   E2 dispatch is at ``0x0800cc14``, using the selector order retained in JSON. Threshold branches
+   validate against **other current settings**, not just fixed minimum/maximum constants. The
+   following pack/cell-voltage bounds are taken from the comparisons, including endpoint
+   strictness:
 
 ======== ==== ===============================
 Key      Unit Setter condition for value x
@@ -303,8 +315,8 @@ local-first frontend.
 
 .. _firmware-behavior-remaining-configuration-comparisons:
 
-Remaining configuration comparisons
------------------------------------
+Temperature and current threshold constraints
+---------------------------------------------
 
 These are E2 **setter acceptance conditions**, using the signed-decimal value x. They describe
 the code’s limits, not recommended operating thresholds. Named fields mean the related current
@@ -342,9 +354,11 @@ comparisons above read **P+0x2c**, a distinct legacy field. Their error messages
 the code does not compare against the reported EHT field. These mismatches and asymmetric
 −39999/100000 endpoints must not be “corrected” in a description of actual firmware behavior.
 
-Evidence: E2 battery branches ``0x0800d1c6``–``0x0800d456``, environment/MOT
-``0x0800e5b4``–``0x0800e878``. Physical mapping of the extra MOT sensor still depends on board
-wiring; these offsets and mC comparisons are established independently.
+.. admonition:: Firmware evidence
+
+   Evidence: E2 battery branches ``0x0800d1c6``–``0x0800d456``, environment/MOT
+   ``0x0800e5b4``–``0x0800e878``. Physical mapping of the extra MOT sensor still depends on board
+   wiring; these offsets and mC comparisons are established independently.
 
 ========= =========================================================================
 Key       Condition (mA)
@@ -449,8 +463,8 @@ The live communication activation and stored bytes are distinguished in
 
 .. _firmware-behavior-additional-shared-setter-checks:
 
-Additional shared setter checks
--------------------------------
+C-firmware setter validation
+----------------------------
 
 +-----------------------------------------------+-----------------------------------------------+
 | Command                                       | Independently reviewed C behavior             |

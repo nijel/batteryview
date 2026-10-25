@@ -1,18 +1,41 @@
-Reproducing the analysis
+Sources and verification
 ========================
+
+This appendix preserves the provenance behind the communication contracts:
+application methods, reviewed firmware hashes, handler and data addresses,
+decoded metadata, and reproducible extraction steps. It is supporting material
+for the manual; source addresses and table offsets are not console parameters.
+
+Application and recording sources
+---------------------------------
+
+The application is an unobfuscated .NET Framework 4.5.2 WinForms assembly. The PDB lists source
+paths but does not supply those source files. Inspection used managed metadata and IL,
+specifically ``PylonSerialPort``, ``MsgBackgroundWorker``, ``HistoryGetInfo``, ``DataStorage``,
+and the History-window button handlers. The Python package does not execute or depend on the
+vendor assembly or its DLLs.
+
+The private reference recordings cover History, Event, and SOC reset workflows. Device
+identities, firmware inventories, timestamps, counters, and raw telemetry remain in the local
+recordings, not in distributed fixtures. The recordings contain some truncated device text. Raw
+export must preserve such text rather than reconstruct it from parsed fields. Tests do not infer
+that truncation is desirable or intentionally reproduce missing serial bytes.
+
+The following is confirmed by IL and/or the supplied files. Actual adapter timing, mode
+switching, and reset execution require hardware validation.
 
 .. _firmware-commands-evidence-and-reproduction:
 
-Evidence and reproduction
--------------------------
+Firmware images and command-table extraction
+--------------------------------------------
 
 The :download:`machine-readable catalog </firmware-commands.json>` preserves every local and
 remote table entry: command name, exact firmware help, maximum token count, required access
 mask, handler address and table-record offset, plus decoded selector tables for
 config/prot/ctrl/datalist. The firmware hashes distinguish these observations from guesses based
-on another revision. The :doc:`parameter and effects reference </protocol/index>` documents
+on another revision. The :doc:`command reference <commands>` documents
 handler-derived argument bases, ranges, defaults, storage effects and unresolved contracts. The
-:doc:`handler/persistence supplement </protocol/index>` adds full record-query forms, callback
+:doc:`storage and persistence chapter <storage>` adds full record-query forms, callback
 storage layouts, calibration and hardware-test behavior, with
 :download:`reproducible decoded metadata </firmware-details.json>`.
 :ref:`Reset analysis <protocol-firmware-evidence-for-soc-reset>` provides the deeper EEPROM and
@@ -52,8 +75,8 @@ It skips unrelated archive entries, including logs.
 
 .. _firmware-behavior-reproducing-the-data-derived-findings:
 
-Reproducing the data-derived findings
--------------------------------------
+Decoded-table verification
+--------------------------
 
 The stdlib-only `detail
 extractor <https://github.com/nijel/pylontech-tools/blob/main/scripts/extract_firmware_details.py>`__

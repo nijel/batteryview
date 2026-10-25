@@ -31,15 +31,15 @@ for integration into your own application, start with
 Explore the protocol
 --------------------
 
-Alongside the software guides, this documentation records what we have learned
-about the console protocol: command parameters, model differences, storage
-behavior, and firmware bugs. Findings distinguish observed application behavior
-from firmware analysis and details that still need hardware validation.
+Alongside the software guides, the communication manual explains console
+sessions, command parameters, responses, model differences, storage behavior, and
+firmware bugs. Source evidence and details that still need hardware validation
+remain available alongside the command contracts.
 
-The :doc:`protocol reference <protocol/index>` is intended to help developers
+The :doc:`communication manual <protocol/index>` is intended to help developers
 understand existing workflows and implement additional operations. Command
 availability varies by model and firmware; the
-:doc:`evidence and limitations <protocol/evidence>` explain the scope of the
+:doc:`compatibility and limitations <protocol/evidence>` explain the scope of the
 analysis.
 
 Pylontech Tools is developed in the

@@ -1,42 +1,14 @@
-Evidence, model differences and limitations
-===========================================
+Firmware compatibility and limitations
+======================================
 
 .. _protocol-evidence-and-limits:
 
-Evidence and limits
+Compatibility scope
 -------------------
 
-The application is an unobfuscated .NET Framework 4.5.2 WinForms assembly. The PDB lists source
-paths but does not supply those source files. Inspection used managed metadata and IL,
-specifically ``PylonSerialPort``, ``MsgBackgroundWorker``, ``HistoryGetInfo``, ``DataStorage``,
-and the History-window button handlers. The Python package does not execute or depend on the
-vendor assembly or its DLLs.
-
-The private reference recordings cover History, Event, and SOC reset workflows. Device
-identities, firmware inventories, timestamps, counters, and raw telemetry remain in the local
-recordings, not in distributed fixtures. The recordings contain some truncated device text. Raw
-export must preserve such text rather than reconstruct it from parsed fields. Tests do not infer
-that truncation is desirable or intentionally reproduce missing serial bytes.
-
-The following is confirmed by IL and/or the supplied files. Actual adapter timing, mode
-switching, and reset execution require hardware validation.
-
-.. _protocol-acceptance-still-requiring-hardware:
-
-Acceptance still requiring hardware
------------------------------------
-
-- Confirm 1200-to-115200 switching, serial adapter behavior, and debug login.
-- Compare a newly collected History and a nonempty Event report with BatteryView on the same
-  firmware; compare structure and captured device data, allowing counters/timestamps to change
-  between runs.
-- Validate module selection with a chain and live ``pwr``/``getpwr`` readings.
-- Exercise the explicitly requested reset on an appropriate device, check barcode restoration
-  and changed address, and retain both recovery state and transcript.
-- Have Pylontech confirm that newly generated reports meet its requirements.
-
-Replay equality proves serialization and command sequencing for recorded responses; it cannot
-prove physical operation or vendor acceptance.
+This chapter defines the supported firmware scope, differences between the two
+reviewed images, and behavior that still needs hardware verification. Consult it
+before applying a command contract to another model or firmware release.
 
 This reference covers **all registered text-console command names** in the two reviewed firmware
 images: **96 names total**, with 81 in E2 V2.5 and 91 in C V3.1. It is an implementation
@@ -50,8 +22,8 @@ and the archive’s example logs are not included in the repository.
 
 .. _firmware-commands-differences-and-help-inconsistencies-to-preserve:
 
-Differences and help inconsistencies to preserve
-------------------------------------------------
+Model differences and misleading help
+-------------------------------------
 
 - E2 contains ``inar``, ``inaw``, ``inash``, ``inacal`` and ``currcal``, with INA226 help.
   ``inacal`` and ``currcal`` have distinct handlers and different maximum token counts.
@@ -73,46 +45,10 @@ Differences and help inconsistencies to preserve
   session-exit command here is ``logout``; that is not established as a substitute for the
   console-mode-switch operation.
 
-.. _firmware-commands-remaining-work-before-implementation:
-
-Remaining work before implementation
-------------------------------------
-
-The :doc:`parameter reference </protocol/index>` and :doc:`handler supplement </protocol/index>`
-record completed analysis and the remaining board/consumer/source limitations. Use the recorded
-handler addresses to establish unresolved parameter units, numeric bases, full accepted forms,
-persistence timing and per-model hardware behavior for each new write/test command. Identify
-operation-specific result messages and recovery requirements, then test with synthetic replies
-before live verification. This catalog proves registration, help metadata and the explicitly
-traced behaviors; it is not a complete decompilation of every command handler or an endorsement
-of running every command as a discovery probe.
-
-This supplements the :doc:`complete command catalog </protocol/commands>`. It records what the
-handlers actually parse, including differences from their help strings. The reviewed images,
-hashes, access modes and remote-routing rules are defined there. Addresses below are runtime
-Thumb-code addresses, with the Thumb bit cleared. **E2 means US_E2_V2.5_Crc.bin; C means
-US_C_V3.1_Crc.bin.**
-
-Unless explicitly marked C or both, detailed observations are **E2-specific**. A shared command
-name does not establish the same contract on another board. The
-:doc:`handler and persistence supplement </protocol/index>` resolves the later record-query,
-callback, calibration, diagnostic and model-comparison findings. Analysis was static; none of
-these operations was tried on a battery. Remaining unknowns are called out rather than filled in
-from command names.
-:ref:`BatteryView’s control descriptions <protocol-command-meanings-from-batteryviews-controls>`
-add vendor UI meanings, model-specific workflows and known configuration defects; those
-application labels do not supersede the firmware contracts below.
-
-This continues the :doc:`parameter reference </protocol/index>` with the remaining dispatch
-branches and storage callbacks. **E2** and **C** identify the exact reviewed images and hashes
-in the :doc:`catalog </protocol/commands>`. Addresses are runtime addresses with the Thumb bit
-cleared. Findings describe static code paths, not successful tests on hardware. Logical storage
-layouts, callback wiring and limits can differ on other firmware versions.
-
 .. _firmware-behavior-independently-checked-c-image-differences:
 
-Independently checked C-image differences
------------------------------------------
+C-firmware behavior differences
+-------------------------------
 
 Shared names do not imply shared electrical procedures. These contracts were checked directly in
 C rather than copied from E2:
@@ -163,8 +99,8 @@ scope.
 
 .. _firmware-behavior-boundaries-of-this-additional-analysis:
 
-Boundaries of this additional analysis
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unresolved protection timing and hardware behavior
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 C independently has the same missing lower-bound check and two raw stores in its ``oc2d`` setter
 (``0x0800e31c``–``0x0800e340``). The signedness issue therefore affects both reviewed images.
@@ -180,3 +116,49 @@ Physical sensor/pin identities, power-loss/wake behavior, live fault recovery, a
 bootloader remain outside what these application paths prove. The later updater analysis narrows
 the transfer-protocol gap to receiver-side behavior; it does not supply those missing receiver
 bytes.
+
+.. _firmware-commands-remaining-work-before-implementation:
+
+Contract limits and unresolved behavior
+---------------------------------------
+
+The :doc:`command reference <commands>` lists registration and access rules; the
+topic chapters give accepted parameters, units, ranges, side effects, and known
+validation defects. They do not establish every common handler's behavior on
+every board. In particular, a shared name does not prove cross-model equivalence.
+
+**E2 means US_E2_V2.5_Crc.bin; C means US_C_V3.1_Crc.bin.** Unless explicitly
+marked C or both, detailed firmware contracts are **E2-specific**. Runtime code
+addresses have the Thumb bit cleared; reviewed image hashes and extraction
+methods are in :doc:`research`. Storage layouts and callback wiring can differ
+on other firmware releases.
+
+The contracts come from static code paths, not successful hardware execution or
+a complete decompilation of every handler. For a new write or test operation,
+resolve any unknown units, numeric bases, accepted forms, persistence timing,
+operation-specific result messages, and recovery requirements before relying on
+it. Preserve explicit unknowns rather than inferring behavior from command names;
+registration is not an endorsement of discovery probes. Test with synthetic
+replies before hardware verification.
+
+:ref:`BatteryView's control descriptions <protocol-command-meanings-from-batteryviews-controls>`
+explain vendor UI meanings, model workflows, and configuration defects. Application
+labels do not supersede firmware contracts. Use :doc:`records`, :doc:`storage`,
+:doc:`calibration`, and :doc:`diagnostics` for the corresponding command behavior.
+
+.. _protocol-acceptance-still-requiring-hardware:
+
+Hardware validation requirements
+--------------------------------
+
+- Confirm 1200-to-115200 switching, serial adapter behavior, and debug login.
+- Compare a newly collected History and a nonempty Event report with BatteryView on the same
+  firmware; compare structure and captured device data, allowing counters/timestamps to change
+  between runs.
+- Validate module selection with a chain and live ``pwr``/``getpwr`` readings.
+- Exercise the explicitly requested reset on an appropriate device, check barcode restoration
+  and changed address, and retain both recovery state and transcript.
+- Have Pylontech confirm that newly generated reports meet its requirements.
+
+Replay equality proves serialization and command sequencing for recorded responses; it cannot
+prove physical operation or vendor acceptance.

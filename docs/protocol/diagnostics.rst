@@ -1,6 +1,15 @@
 Diagnostics and hardware tests
 ==============================
 
+Use this chapter for display, communication diagnostics, injected readings, and
+hardware-test procedures. The tables state operands, units, operating effects,
+and result interpretation. A test-like name does not imply a passive read:
+commands can drive outputs, alter storage, or enter loops.
+
+Interpret an operation-specific result independently of the standard success
+footer. For ordinary read-only counters, clock, logs, and configuration, see
+:doc:`console`, :doc:`records`, :doc:`calibration`, and :doc:`configuration`.
+
 .. _firmware-parameters-manufacturing-tests-and-injected-readings:
 
 Manufacturing tests and injected readings
@@ -12,8 +21,8 @@ footer.
 
 .. _firmware-parameters-parameters-confirmed-from-e2-handlers:
 
-Parameters confirmed from E2 handlers
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+E2 test-command parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 +-----------------------------------------------+-----------------------------------------------+
 | Form                                          | Parameters and behavior                       |
@@ -83,11 +92,13 @@ Parameters confirmed from E2 handlers
 |                                               | deeper review.                                |
 +-----------------------------------------------+-----------------------------------------------+
 
-Evidence: E2 ``tbar`` ``0x0802b080``, ``tinput`` ``0x0802b1b8``, ``tchgc`` ``0x0800f75c``,
-``tdisc`` ``0x0800f888``, ``tvolt`` ``0x0800f418``, ``ttmp`` ``0x0800f548``, ``teepr``
-``0x0801045a``. C ``tchgc``/``tdisc`` permit at most **one** operand; do not send the E2
-tolerance operand there. C defaults/tolerances were independently traced and are tabulated in
-the supplement; notably its one-operand discharge test uses ±50 mA.
+.. admonition:: Firmware evidence
+
+   Evidence: E2 ``tbar`` ``0x0802b080``, ``tinput`` ``0x0802b1b8``, ``tchgc`` ``0x0800f75c``,
+   ``tdisc`` ``0x0800f888``, ``tvolt`` ``0x0800f418``, ``ttmp`` ``0x0800f548``, ``teepr``
+   ``0x0801045a``. C ``tchgc``/``tdisc`` permit at most **one** operand; do not send the E2
+   tolerance operand there. C defaults/tolerances were independently traced and are tabulated in
+   the supplement; notably its one-operand discharge test uses ±50 mA.
 
 .. _firmware-parameters-tmprctrl-the-selector-also-chooses-the-quantity:
 
@@ -132,8 +143,8 @@ voltage. These are runtime injected readings/flags, not temperature calibration 
 
 .. _firmware-parameters-other-parameterized-handlers-remaining-limits:
 
-Other parameterized handlers: remaining limits
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Other test-command parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 +-----------------------------------------------+-----------------------------------------------+
 | Command                                       | Known form and unresolved details             |
@@ -191,8 +202,8 @@ Other parameterized handlers: remaining limits
 
 .. _firmware-parameters-no-operand-hardware-handlers:
 
-No-operand hardware handlers
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Hardware commands without operands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The registered token ceiling confirms that the following accept **no additional console
 operands**. Handler-confirmed details are identified explicitly; the remaining help-based
@@ -378,8 +389,8 @@ injection stops these overrides; it does not restore previous accumulated values
 
 .. _firmware-behavior-hardware-test-procedures-visible-in-the-application:
 
-Hardware-test procedures visible in the application
----------------------------------------------------
+Hardware-test procedures and side effects
+-----------------------------------------
 
 The following describes firmware operations, not a validated external test fixture. GPIO
 addresses establish software pin access; electrical connector pinouts, active power-path
@@ -612,8 +623,8 @@ paths can return zero even when the electrical comparison fails.
 
 .. _firmware-behavior-display-cadence-and-additional-cross-image-checks:
 
-Display cadence and additional cross-image checks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Display cadence and model differences
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 All identified E2 literal references to the display state at ``0x20000ce4`` are in the selection
 setter, output routine and scheduler. The scheduler only checks the enable byte and calls the
@@ -630,8 +641,8 @@ command’s full equivalence.
 
 .. _firmware-behavior-actual-display-scheduling:
 
-Actual display scheduling
--------------------------
+Display scheduling and output
+-----------------------------
 
 The E2 display runs from a timer interrupt, rather than a scalar-controlled console loop. The
 complete reviewed path is:
@@ -672,3 +683,21 @@ reload **499**, also nominally 500 ms under its clock setup. Vector ``0x080038b4
 ``0x0803625e``; the timer IRQ helper calls ``0x0801676c``, which selects ``0x40000400`` and
 calls scheduler ``0x080150fc``. Thus the nominal 2-second display cadence is independently
 supported in both images, despite different timer-driver implementations.
+
+.. _protocol-monitor-ic-read-limits:
+
+Monitor IC read limits
+----------------------
+
+E2 ``bmicrdcfg`` allocates a **16-byte caller buffer**. Its reader at ``0x0801564e`` receives
+and copies **eight bytes per IC** (six data plus two check bytes) into that buffer. No caller
+limit guards the count: **copying three or more ICs overflows the command’s buffer**. The
+driver’s own receive buffer is 256 bytes, providing a second insufficient bound for unrestricted
+counts.
+
+``bmicrdcomm`` uses the same 16-byte caller allocation and an analogous count-based reader. The
+count is narrowed to u8 only after a setup call using the full parsed value. Thus these are not
+safe “arbitrary count” diagnostics; a future client must restrict count to the board’s actual
+monitor configuration and no more than **two** for these handlers. This is a software buffer
+bound, not evidence that every supported board physically has two ICs. It resolves the
+handler/driver limit without requiring a live overflow probe.

@@ -1,6 +1,16 @@
 Reset, shutdown and firmware updating
 =====================================
 
+``trst`` restarts the MCU, ``shut`` initiates shutdown, and ``updata`` requests
+bootloader entry. None is a substitute for closing a console session. These
+commands have no operands; their effects and refusal conditions are described
+below.
+
+The update-transfer section documents the PC sender's handshake, frame format,
+retries, and recovery sequence. The bootloader receiver is not present in the
+reviewed images, so receiver-side validation and recovery guarantees remain
+unverified.
+
 .. _firmware-parameters-reset-shutdown-and-update:
 
 Reset, shutdown and update
@@ -14,11 +24,11 @@ actions, not session-exit commands.
   “erase EEPROM.”
 - ``shut``: E2 ``0x0800c498`` sets shutdown-related module flags; the master has a broadcast
   path and non-master handling differs. No “type twice to confirm” guard was found inside this
-  handler. The supplement traces persistence/control steps and the
+  handler. The reset/shutdown effects section describes persistence/control steps and the
   ``Power Input OK, Cannot shut down!`` refusal path; power removal and wake sources depend on
   circuitry.
 - ``updata``: writes boot marker ``0x55aa55aa`` at MCU flash ``0x0803f000``, checks status and
-  resets. The receiver is in the missing bootloader region. The supplement now documents the PC
+  resets. The receiver is in the missing bootloader region. The update-transfer section documents the PC
   sender’s handshake, 128-byte checksum frames, recovery flow and post-update operations;
   receiver validation/recovery guarantees remain unknown.
 
@@ -29,8 +39,8 @@ additional write operations.
 
 .. _firmware-behavior-reset-shutdown-and-the-missing-update-receiver:
 
-Reset, shutdown and the missing update receiver
------------------------------------------------
+Reset and shutdown effects; update receiver limitations
+-------------------------------------------------------
 
 E2 ``trst`` sets reset/system-event flags, creates a history record, persists both state blocks,
 then reaches the Cortex-M reset request. Erase commands are not an implicit part of reset. This
@@ -59,8 +69,8 @@ It does **not** receive a firmware image through this console handler. The revie
 at **0x08003800**; the preceding bootloader region ``0x08000000..0x080037ff`` is absent. The
 marker page is also outside the E2 image payload. The application bytes cannot establish
 receiver validation, flash-write ordering, power-failure recovery or update-mode timeout. The
-archive also contains a PC updater; its sender protocol is now traced in
-:ref:`the updater analysis below <firmware-behavior-pc-updater-transfer-protocol>`. That
+archive also contains a PC updater; its sender protocol is described in
+:ref:`the update-transfer contract <firmware-behavior-pc-updater-transfer-protocol>`. That
 establishes sender behavior, not the missing receiver implementation. No live update was
 attempted.
 

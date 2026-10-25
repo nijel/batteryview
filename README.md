@@ -25,7 +25,7 @@ Browse the [online documentation](https://pylontech-tools.readthedocs.io/en/late
 
 - [Python library and CLI](https://pylontech-tools.readthedocs.io/en/latest/software/index.html): installation, reports,
   support collection, monitoring, SOC reset, API, and troubleshooting.
-- [Protocol reference](https://pylontech-tools.readthedocs.io/en/latest/protocol/index.html): console commands, parameters,
+- [Communication manual](https://pylontech-tools.readthedocs.io/en/latest/protocol/index.html): console commands, parameters,
   firmware behavior, BatteryView workflows, evidence, and remaining unknowns.
 - [Development and documentation builds](https://pylontech-tools.readthedocs.io/en/latest/software/development.html).
 

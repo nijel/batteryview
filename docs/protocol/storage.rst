@@ -1,6 +1,16 @@
 EEPROM, flash and persistence
 =============================
 
+EEPROM, external flash, and MCU memory use different command families and address
+spaces. Read and write forms are listed explicitly below, with byte offsets and
+bounds. A chip number is a logical device selector, not a module address or MCU
+flash-bank number.
+
+``eepe`` zeroes a complete selected EEPROM; it is not a record-log clear or a
+narrow SOC-percentage reset. See :ref:`SOC-reset erase scope
+<protocol-firmware-evidence-for-soc-reset>` before interpreting that workflow.
+The persistence sections explain when runtime changes reach storage.
+
 .. _firmware-parameters-eeprom-flash-and-raw-mcu-memory:
 
 EEPROM, flash and raw MCU memory
@@ -71,15 +81,17 @@ For example, ``eepr 0 20 16`` requests sixteen bytes at **hexadecimal 0x20**.
 ``eepw 0 20 AA 10`` requests **sixteen copies** of 0xAA. These are explanatory examples, not
 steps required to inspect a connected battery.
 
-Evidence: E2 ``eepe`` ``0x08010410``, erase helper ``0x080101ee``, EEPROM read/write bounds
-``0x0800ffe4``/``0x0801004a``. C ``eepe`` ``0x080103dc``, erase helper ``0x08010142``: the same
-full-2-KiB zeroing. Detailed flash/memory contracts above are E2 observations; entry addresses
-for each command are in the JSON.
+.. admonition:: Firmware evidence
+
+   Evidence: E2 ``eepe`` ``0x08010410``, erase helper ``0x080101ee``, EEPROM read/write bounds
+   ``0x0800ffe4``/``0x0801004a``. C ``eepe`` ``0x080103dc``, erase helper ``0x08010142``: the same
+   full-2-KiB zeroing. Detailed flash/memory contracts above are E2 observations; entry addresses
+   for each command are in the JSON.
 
 .. _firmware-behavior-what-the-persistence-callbacks-actually-do:
 
-What the persistence callbacks actually do
-------------------------------------------
+Persistence timing and stored state
+-----------------------------------
 
 .. _firmware-behavior-statistics-and-extended-state:
 
