@@ -69,3 +69,13 @@ names; absent measurements are ``None``. Results retain raw console data.
    :members:
    :undoc-members:
 
+
+.. autoclass:: pylontech_tools.ConsoleReadResult
+   :members:
+   :undoc-members:
+
+.. autoclass:: pylontech_tools.DeviceBusyError
+   :members:
+
+.. autoclass:: pylontech_tools.DeviceNotPresentError
+   :members:

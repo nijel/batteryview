@@ -141,7 +141,9 @@ For remote-capable names the frontend recognizes a decimal module address as the
 the address before invoking the local handler when it matches the current module, forwards other
 targets when connected to module 1, or reports a target mismatch on a non-master. Forwarding can
 report ``Target device is Busy`` or ``Target device is not present``; retain these as specific
-operational failures rather than generic parse errors.
+operational failures rather than generic parse errors. Python raises ``DeviceBusyError``
+or ``DeviceNotPresentError`` for these replies, including replies with a success
+footer. They do not trigger automatic retries or unsupported-command fallback.
 
 The remote tables contain ``config``, ``ctrl``, ``data``, ``emptyvolt``, ``info``, ``login``,
 ``logout``, ``prot``, ``couls``, ``soh``, ``stat`` and ``statc``. **A remote-table entry alone

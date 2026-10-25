@@ -86,6 +86,10 @@ def parser() -> argparse.ArgumentParser:
     ports.add_argument("--format", choices=["json", "csv"], default="json")
     for name, help_text in [
         ("info", "read device identity"),
+        ("stat", "read counters, record counts, and state of health"),
+        ("time", "read the battery clock without setting it"),
+        ("log", "read the diagnostic log without clearing it"),
+        ("config", "display configuration without changing it"),
         ("snapshot", "read module and cell measurements"),
         ("watch", "stream module and cell measurements"),
         ("history", "save a BatteryView-compatible History transcript"),
@@ -101,7 +105,7 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--timeout", type=_positive, default=5, help="response timeout in seconds"
         )
-        if name in {"info", "snapshot", "watch"}:
+        if name in {"info", "snapshot", "watch", "stat", "config"}:
             command.add_argument(
                 "--module",
                 type=int,
@@ -123,6 +127,11 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument(
                 "--output", type=Path, help="new transcript path; never overwritten"
             )
+        elif name in {"stat", "time", "log", "config"}:
+            command.add_argument("--format", choices=["text", "json"], default="text")
+            command.add_argument("--output", type=Path, help="new output file (default: stdout)")
+            if name == "log":
+                command.add_argument("--count", type=int, choices=range(1, 33), metavar="1..32")
         else:
             command.add_argument("--format", choices=["json", "csv"], default="json")
             command.add_argument("--output", type=Path, help="new output file (default: stdout)")
@@ -239,7 +248,23 @@ def _run(args: argparse.Namespace) -> int:
                 args.output.open("x", encoding="utf-8", newline="") if args.output else sys.stdout
             )
             try:
-                if args.command == "info":
+                if args.command in {"stat", "time", "log", "config"}:
+                    if args.command == "log":
+                        result = client.diagnostic_log(args.count)
+                    else:
+                        result = getattr(
+                            client,
+                            {"stat": "statistics", "time": "read_clock", "config": "configuration"}[
+                                args.command
+                            ],
+                        )()
+                    output.write(
+                        result.text
+                        if args.format == "text"
+                        else json.dumps(asdict(result), ensure_ascii=False) + "\n"
+                    )
+                    output.flush()
+                elif args.command == "info":
                     identity = asdict(client.info())
                     if args.format == "json":
                         output.write(json.dumps(identity, ensure_ascii=False) + "\n")

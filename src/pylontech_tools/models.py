@@ -109,3 +109,12 @@ class CollectionResult:
     directory: Path
     manifest_path: Path
     complete: bool
+
+
+@dataclass(frozen=True)
+class ConsoleReadResult:
+    """A diagnostic read with its complete response and unscaled labeled fields."""
+
+    command: str
+    text: str
+    fields: dict[str, str] = field(default_factory=dict)

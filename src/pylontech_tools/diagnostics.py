@@ -19,6 +19,9 @@ def command_label(command: str) -> str:
     known = {
         "info",
         "stat",
+        "time",
+        "log",
+        "config",
         "login",
         "pwr",
         "getpwr",

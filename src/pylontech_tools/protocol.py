@@ -13,6 +13,8 @@ from .errors import (
     CommandCancelled,
     CommandTimeout,
     ConnectionError,
+    DeviceBusyError,
+    DeviceNotPresentError,
     ProtocolError,
     PylontechError,
     UnsupportedCommand,
@@ -208,6 +210,22 @@ class ConsoleSession:
                 time.monotonic() - started,
                 response.unsupported,
             )
+            # Firmware can report a target failure alongside a success footer.
+            for pattern, error_type, message in (
+                (r"Target device is Busy", DeviceBusyError, "Target device is busy"),
+                (
+                    r"(?:Target device|Device [0-9]+) is not present",
+                    DeviceNotPresentError,
+                    "Target device is not present",
+                ),
+            ):
+                if re.search(
+                    r"(?:^|[\r\n])[ \t]*" + pattern + r"[.!]?[ \t]*(?=[\r\n]|$)",
+                    response.text,
+                    re.I,
+                ):
+                    logger.debug("Target failure command=%s error=%s", label, error_type.__name__)
+                    raise error_type(message, response=response.text, context=response.context)
             if response.unsupported and not allow_unsupported:
                 raise UnsupportedCommand(
                     f"Unsupported command: {label!r}",

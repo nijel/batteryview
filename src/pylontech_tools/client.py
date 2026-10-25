@@ -23,6 +23,7 @@ from .errors import (
 )
 from .models import (
     CollectionResult,
+    ConsoleReadResult,
     DeviceInfo,
     ModuleReading,
     ReportResult,
@@ -30,6 +31,7 @@ from .models import (
     SystemReading,
 )
 from .parsers import (
+    key_values,
     parse_getpwr,
     parse_info,
     parse_pwr,
@@ -60,7 +62,7 @@ class BatteryClient:
         profile: str | None = None,
         read_retries: int = 0,
     ):
-        if module is not None and not 1 <= module <= 16:
+        if module is not None and (type(module) is not int or not 1 <= module <= 16):
             raise ValueError("Module must be between 1 and 16")
         if not math.isfinite(timeout) or timeout <= 0 or baudrate <= 0:
             raise ValueError("Timeout must be finite and positive; baud rate must be positive")
@@ -127,6 +129,41 @@ class BatteryClient:
             self._identity = self._parse(parse_info, self._read(command).text, command=command)
             return self._identity
 
+    def _diagnostic_read(self, command: str) -> ConsoleReadResult:
+        with self.session.lock:
+            response = self._read(command)
+            # A bare date/time contains colons but is not a labeled field.
+            fields = {
+                label: value
+                for label, value in key_values(response.text).items()
+                if any(character.isalpha() for character in label)
+            }
+            return ConsoleReadResult(command, response.text, fields)
+
+    def statistics(self) -> ConsoleReadResult:
+        """Read counters, record counts, SOH, and SOC without clearing them."""
+        return self._diagnostic_read(f"stat {self.module}" if self.module else "stat")
+
+    def read_clock(self) -> ConsoleReadResult:
+        """Read the directly connected battery's RTC without setting it."""
+        self._direct_only("Clock read")
+        return self._diagnostic_read("time")
+
+    def diagnostic_log(self, count: int | None = None) -> ConsoleReadResult:
+        """Read the local diagnostic ring, newest first; count must be 1–32.
+
+        Omit count to let the firmware select the available entries. The response
+        is preserved without interpreting log entries or assuming their validity.
+        """
+        self._direct_only("Diagnostic log")
+        if count is not None and (type(count) is not int or not 1 <= count <= 32):
+            raise ValueError("Log count must be an integer between 1 and 32")
+        return self._diagnostic_read("log" if count is None else f"log {count}")
+
+    def configuration(self) -> ConsoleReadResult:
+        """Display the complete configuration without supplying setter operands."""
+        return self._diagnostic_read(f"config {self.module}" if self.module else "config")
+
     def collect(self, output: str | Path, *, progress: Progress | None = None) -> CollectionResult:
         """Collect the directly connected module, stopping at the first failure.
 
@@ -181,6 +218,14 @@ class BatteryClient:
                 }
                 if writer is not None:
                     writer.append(response.text)
+                if command.split()[0] in {"data", "datalist"} and re.search(
+                    r"(?:^|[\r\n])[ \t]*Error![ \t]*(?=[\r\n]|$)", response.text
+                ):
+                    raise ProtocolError(
+                        "Firmware reported a corrupt record; report incomplete",
+                        response=response.text,
+                        context=self._last_context,
+                    )
                 return response
         raise AssertionError("unreachable")
 
@@ -602,6 +647,15 @@ class BatteryClient:
                         }.values()
                     ),
                 )
+                if (
+                    addressed
+                    and profile.addressed_pwrsys
+                    and (type(module.address) is not int or not 1 <= module.address <= 16)
+                ):
+                    raise ProtocolError(
+                        "Cannot query pwrsys with an invalid module address",
+                        response=raw.get("pwr", ""),
+                    )
                 command = (
                     f"pwrsys {module.address}"
                     if addressed and profile.addressed_pwrsys

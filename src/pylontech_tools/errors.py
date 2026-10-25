@@ -30,6 +30,14 @@ class UnsupportedCommand(ProtocolError):
     """The console rejected a command."""
 
 
+class DeviceBusyError(ProtocolError):
+    """The target module cannot currently handle the request."""
+
+
+class DeviceNotPresentError(ProtocolError):
+    """The requested module is not present."""
+
+
 class ResetRecoveryError(PylontechError):
     """A reset was interrupted; consult the saved recovery state before continuing."""
 

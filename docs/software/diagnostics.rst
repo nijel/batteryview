@@ -43,3 +43,45 @@ Library callers configure standard Python logging themselves. For metadata:
 Raw I/O uses the separate ``pylontech_tools.serial`` logger at level 5 (``TRACE``), below ``DEBUG``.
 Enable it explicitly with ``logging.getLogger("pylontech_tools.serial").setLevel(5)`` and a handler
 that accepts that level. The library installs no output handlers or root-logger configuration.
+
+Read-only battery diagnostics
+-----------------------------
+
+These explicit reads display information without setting the clock, changing
+configuration, or clearing counters or logs:
+
+.. code-block:: sh
+
+   pylontech-console stat --port /dev/ttyUSB0
+   pylontech-console time --port /dev/ttyUSB0
+   pylontech-console log --port /dev/ttyUSB0
+   pylontech-console log --port /dev/ttyUSB0 --count 8
+   pylontech-console config --port /dev/ttyUSB0
+
+``stat`` reads operating/fault counters, record counts, SOH, and SOC fields.
+``time`` reads the battery RTC; its timezone is not inferred. ``log`` reads the
+internal diagnostic ring, which is separate from the recorded events exported
+by ``event``. It traverses newest first. Omit ``--count`` to use the firmware's
+available-entry count; an explicit count must be 1–32 and does not establish that
+all requested entries contain valid historical data. ``config`` displays the
+full configuration without accepting selector or setter operands.
+
+``stat`` and ``config`` accept ``--module 1..16`` using explicit command routing.
+The master must be able to reach that module; a non-master cannot be assumed to
+forward requests. ``time`` and ``log`` require a direct connection and do not
+accept ``--module``. Firmware availability and access permissions still apply;
+unsupported commands are reported without speculative aliases or mode changes.
+
+The default output is the complete console response, including echoes and
+framing. Use ``--format json`` for an object containing ``command``, ``text``, and
+``fields``. Fields retain labeled values as strings without unit conversion;
+unstructured output remains in ``text``. Bare timestamps are not treated as
+labeled fields. Use ``--output diagnostic.txt`` to create a new UTF-8 output file;
+existing files are never overwritten. These outputs can contain private device
+information. The reads are not added to default support collection.
+
+The existing ``--debug``, ``--trace-serial``, and ``--read-retries`` options apply.
+Only timeout/connection failures qualify for bounded read recovery after a debug
+prompt has been verified. Busy-target and absent-device failures are explicit,
+even if the firmware also emits a success footer; neither is retried or treated
+as an unsupported optional command.

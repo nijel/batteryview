@@ -279,7 +279,9 @@ The two all-record list forms load records through module callback ``+0x288``, c
 two records per output chunk; the single-cell form formats up to sixteen. Continuation is
 controlled by the output/pager helper, so stopping at one chunk does not mean the collection
 ends there. Summary/detail loops also validate the record and cell buffer boundaries; retain
-error output rather than silently treating a corrupt record as absent.
+error output rather than silently treating a corrupt record as absent. Python rejects
+explicit ``Error!`` record replies and preserves them in the partial transcript,
+even when the expected record indices are also present.
 
 The all-cell ``curr`` branch divides stored current by **1000 using signed integer division**
 (``0x0800c280``–``0x0800c28c``). The single-cell branch prints the stored integer directly
