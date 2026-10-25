@@ -463,7 +463,7 @@ runtime injected readings/flags, not temperature calibration EEPROM writes.
 | Command | Known form and unresolved details |
 | --- | --- |
 | `bmicrdcfg total-ic`, `bmicrdcomm total-ic` | Required **D** IC-count operand. E2 `bmicrdcfg` rejects zero; `bmicrdcomm` has no corresponding zero check. Both pass a u8 count after setup; no upper bound is enforced. The reader copies eight bytes per IC into the command’s 16-byte buffer: **count >=3 overflows it**. Restrict to the actual board count and at most two; details in supplement. |
-| `disp ...` | Repeated-display selections include `pwrs`, `bats`, `volt`, `curr`, `temp`; numeric selection and scalar forms exist. Complete selection forms and `disp 0` stop behavior are in the supplement; a positive scalar writes fields not consulted by the reviewed display consumer, so time units are not assumed. |
+| `disp ...` | Repeated-display selections include `pwrs`, `bats`, `volt`, `curr`, `temp`; numeric selection and scalar forms exist. Complete selection forms and `disp 0` stop behavior are in the supplement; a positive scalar writes fields not consulted by the reviewed display consumer, so time units are not assumed. The timer path now establishes a nominal two-second display cadence in both reviewed images. |
 | `euro ...`, `eurostub ...` | Report/clear and init/off/three-number injection forms, all eight slot meanings/units and the non-master Euro pointer bug are in the supplement. |
 | `tled selector [on\|off]` | `tled`, `tled on|off`, `tled 1..8 on|off` and `tled 0` are traced in the supplement, including persistent test-mode flag behavior. |
 | `tmos {cfet\|dfet}` | Selects FET test; initial-current bounds, clear/set sequence, delays and forced restoration level are in the supplement. External fixture requirements remain board-specific. |
@@ -507,9 +507,10 @@ They are actions, not session-exit commands.
   steps and the `Power Input OK, Cannot shut down!` refusal path; power removal
   and wake sources depend on circuitry.
 - `updata`: writes boot marker `0x55aa55aa` at MCU flash `0x0803f000`, checks
-  status and resets. The actual receiver is in the missing bootloader region;
-  the supplement documents why its transfer protocol cannot be read from these
-  application images.
+  status and resets. The receiver is in the missing bootloader region. The
+  supplement now documents the PC sender's handshake, 128-byte checksum frames,
+  recovery flow and post-update operations; receiver validation/recovery
+  guarantees remain unknown.
 
 Do not automatically repeat state-changing commands after a timeout. For future
 implementation, use the confirmed forms above, validate inputs more strictly

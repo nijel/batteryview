@@ -544,11 +544,12 @@ E2 `updata` at `0x08028d1e`:
 It does **not** receive a firmware image through this console handler. The
 reviewed images begin at **0x08003800**; the preceding bootloader region
 `0x08000000..0x080037ff` is absent. The marker page is also outside the E2 image
-payload. Thus the bootloader transfer commands, validation/recovery rules and
-update-mode timeout cannot be recovered from the supplied application bytes.
-Closing that gap needs the matching bootloader or a separate updater/protocol
-analysis; it is a source limitation, not an undocumented optional `updata`
-parameter. No live update was attempted.
+payload. The application bytes cannot establish receiver validation, flash-write ordering,
+power-failure recovery or update-mode timeout. The archive also contains a PC
+updater; its sender protocol is now traced in
+[the updater analysis below](#pc-updater-transfer-protocol). That establishes
+sender behavior, not the missing receiver implementation. No live update was
+attempted.
 
 ## Independently checked C-image differences
 
@@ -754,7 +755,8 @@ all four measurements were read successfully.
 All identified E2 literal references to the display state at `0x20000ce4` are in
 the selection setter, output routine and scheduler. The scheduler only checks
 the enable byte and calls the output routine; neither consumer uses the scalar
-at `+0x14` or the flag at `+0x10`. No effective interval control was established.
+at `+0x14` or the flag at `+0x10`. The positive scalar does not control this path; the actual nominal cadence is
+now traced in [the scheduler analysis below](#actual-display-scheduling).
 The C setter independently has the same two writes at
 `0x0800a248`–`0x0800a24c`. Keep the positive scalar form documented as a stored
 value, without promising a cadence change.
@@ -780,3 +782,179 @@ accept only 0–5000 ms. This remains a specific downstream-analysis gap.
 
 Physical sensor/pin identities, power-loss/wake behavior, live fault recovery,
 and the absent bootloader remain outside what these application paths prove.
+The later updater analysis narrows the transfer-protocol gap to receiver-side
+behavior; it does not supply those missing receiver bytes.
+
+
+## Actual display scheduling
+
+The E2 display runs from a timer interrupt, rather than a scalar-controlled
+console loop. The complete reviewed path is:
+
+| Stage | E2 evidence |
+| --- | --- |
+| Timer setup | `0x0801f528`–`0x0801f584`: prescaler = clock / 10000 − 1; reload = **4999**; peripheral base `0x40000400`. |
+| Register writes | `0x08024868`–`0x0802486e` write the reload and prescaler. The configured clock variable starts at **72000000**; startup fallback stores **8000000** at `0x08037ca8`. |
+| Interrupt wiring | Vector word at `0x080038b4` = `0x080377f9`; handler `0x080377f8` checks the pending source and calls `0x080153a8`. |
+| Scheduler | `0x080153c2`–`0x08015442` increments a phase counter, resets it at **4**, and calls the enabled display at phase **3**. |
+
+Under the configured timer-clock assumptions this is a **500 ms tick**, with
+one display invocation per **four ticks**, nominally **2 seconds**. It is a
+code-derived invocation cadence, not a promise that every selection emits a
+complete table on each call or measured wall-clock precision: interrupt masking,
+blocking work and the scheduler's early-exit flag can delay or skip processing.
+The scalar form `disp 1..300` does not change the prescaler, reload, phase count
+or invocation gate in this path. Do not implement it as a firmware-supported
+interval selector merely because the value looks like a duration.
+
+C independently uses the same four-phase scheme and phase-3 display call
+(`0x08015116`–`0x080151a8`). Its timer initializer `0x0801eda6` uses clock / 1000
+− 1 and reload **499**, also nominally 500 ms under its clock setup. Vector
+`0x080038b4` points to `0x0803625e`; the timer IRQ helper calls `0x0801676c`,
+which selects `0x40000400` and calls scheduler `0x080150fc`. Thus the nominal
+2-second display cadence is independently supported in both images, despite
+different timer-driver implementations.
+
+## Additional shared setter checks
+
+| Command | Independently reviewed C behavior |
+| --- | --- |
+| `emptyvolt` | `0x0802d7d0`–`0x0802d85c`: decimal conversion, **u16 narrowing before 500–3300 validation**, runtime halfword plus two-byte EEPROM-0 `0x7a3` write. The handler ignores the EEPROM-write result and returns zero. This matches the E2 setter contract; it does not prove identical SOC algorithms. |
+| `totalcoul` | `0x0802d570` onward: **u8 narrowing before checking 50/74/100 Ah**; internal capacity = Ah × 3,600,000. Writes eight bytes to EEPROM-1 `0x21` and a check byte to `0x29`, then reads them back. On the success path it changes model identity/runtime selection and invokes operations `0x0f` and `0x11` with value 1 to restore/persist model defaults. It is broader than changing a gauge report scale. |
+
+For `totalcoul`, the C success branches select `US3000C` for 74, `US2000C` for
+50, and `UP5000` for 100 (`0x0802d69a`–`0x0802d764`). The selector helper
+`0x08012dfa` stores a runtime byte, not a bus programming operation. No direct
+gauge-register write appears in this handler. A future client should validate
+literal capacity values before narrowing and describe the accompanying model
+and protection-default changes; it should not accept aliases produced by u8
+wraparound. Callback dispatch `0x08010dd0` resolves the two operations to
+`0x0801132a` and `0x08011384`; their value-1 branches restore defaults before
+writing the parameter blocks at EEPROM-0 `0x5a9` and `0x699`.
+
+## PC updater transfer protocol
+
+This section is based on **static managed-code inspection**, not a captured
+battery session. It closes the sender-side portion of the bootloader gap using
+`Update Tool.exe` from the supplied archive. SHA-256:
+`dc78709db0c9694ae102e5415bece656b93e30dec27fc2b8722491e6050a5cfb`.
+The accompanying `UpdateConfig.xml` has SHA-256
+`d71a2249f8fd7be2296b5585a8650330450b5e7fa6135d50d761dbe4e2629777`.
+Neither file nor any original log is copied into this repository.
+
+### Normal update handshake and framing
+
+`MsgBackgroundWorker.OnUpdate` (method RVA **`0xfe24`**) reads `info`, prepares
+the selected image and waits for **NAK `0x15`** in the receive buffer. While
+waiting it sends configured command **`updata`** every 10000 iterations of a
+loop that sleeps 1 ms, stopping after more than 30000 iterations. These are
+iteration-based approximate timings, not a bootloader timeout specification.
+After detecting the start marker it changes baud to configured **115200** if
+needed, waits **1000 ms**, then transfers frames.
+
+The active path calls **`XModemData.Fill`** (RVA **`0x113d4`**), not the method
+named `Fill_Xmodem1k`. It constructs frames as follows:
+
+| Part | Bytes / rule |
+| --- | --- |
+| Start | **`01`**. |
+| Block number | `(zero_based_frame_index + 1) mod 256`. |
+| Complement | `255 − block_number`. |
+| Payload | **128 bytes**, sequential file bytes padded with **`1a`**. |
+| Checksum | **One byte: sum(payload) & ff**; excludes the three header bytes. |
+
+For a synthetic one-byte input `02`, the payload is `02` followed by 127
+`1a` bytes and the checksum is **`e8`**. This example uses invented bytes, not
+an original firmware payload or battery log.
+
+Each frame is therefore **132 bytes**. `XmodemFrame.get_Frame` (RVA
+**`0x10e38`**) assembles this layout. The count is explicitly
+**`floor(file_length / 128) + 1`**, so an exactly aligned file gets a whole extra
+padding frame. That is observed sender behavior, not a requirement proven from
+the receiver. A future implementation must make the compatibility choice
+explicit rather than accidentally changing the trailing-frame behavior.
+
+`TransBinFile` (RVA **`0x10534`**) sleeps **10 ms** between frames by the compiled
+default. The first attempt for frame zero waits **10 seconds**; later attempts
+use configured **2 seconds**. `SendPackage` (RVA **`0x107b0`**) calls the raw
+byte-array send overload at RVA **`0xae90`**: it writes the entire frame without
+an appended CR/newline and converts its timeout argument to milliseconds.
+Thus a generic text-command sender would be incorrect here.
+
+### Replies, retries and completion
+
+| Value / text | Sender interpretation |
+| --- | --- |
+| **`06` ACK** | Accept frame and advance. |
+| **`15` NAK** | Retry the same frame. The ordinary response check tests NAK before ACK, so NAK wins if both occur in the response. |
+| **`18` CAN** | Has a cancellation-result branch in `SendPackage`; see the event-matching limitation below. |
+| Three consecutive NAKs or `updata again` | Classified by the timeout/error path as an update/restart condition, rather than an ordinary single-frame NAK. |
+| `back to` | Classified by that path as return to the application. |
+| **`04` EOT** | Sent once as a raw byte after the frames; this path does not wait for an EOT ACK. |
+
+The retry loop resends the **same buffered frame**, with compiled/configured
+`ResendCount = 20`. It performs one initial send, then retries and increments its
+counter **before checking whether that retry succeeded**. With repeated
+ordinary NAKs/timeouts it can therefore attempt **22 writes**, not 20: one
+initial attempt and 21 retries, with retry 21 rejected by the `counter > 20`
+check. Even an ACK on that final retry is rejected by this ordering. Earlier
+terminal results can stop sooner. A new implementation should define an exact
+attempt budget and accept a valid ACK before deciding to retry; this is a
+sender off-by-one bug, not an inferred receiver requirement.
+
+The completion event matcher for packets is registered as pattern **8**, with
+ACK and NAK regular expressions only (`PylonSerialPort.InitialPatternDict`, RVA
+**`0x9efc`**). Although `SendPackage` checks CAN in a completed response, this
+does not establish immediate handling of a **CAN-only** response. The actual
+pattern-8 predicate in `isReceivedInvalid` (RVA **`0x9ffc`**) explicitly tests
+only ACK/NAK. Furthermore, `TransBinFile` does not terminate on cancellation
+result 2: that result falls through to its retry logic. Do not copy either
+omission or present this as complete cancellation support.
+
+After normal transfer, `OnUpdate` reconnects through `DoUpdataFinish` (RVA
+**`0x109b4`**) without waiting for the configured completion text. The recovery
+path below instead waits for the finish pattern, compiled as case-insensitive
+**`ok`**, for the configured **5 seconds**. These two success paths differ.
+Neither proves that the receiver validates the full image before executing it.
+
+### Recovery and post-update operations
+
+`OnReUpdate` (RVA **`0x101b8`**) prompts for a power cycle, repeatedly sends
+text **`pylon`** with a **50 ms** sleep, and looks for **`BootLoader version`**.
+The loop stops after its counter exceeds 600. It then clears receive state and
+waits for NAK using another 1 ms/30000-iteration loop, waits 100 ms, and uses the
+same 128-byte transfer routine. This is evidence for the PC tool's boot-entry
+handshake, not an application console command or a general console recovery
+sequence. `StartByteFlag = 43,15,15` exists in the configuration loader, but
+these reviewed update paths do not send that configured byte array.
+
+Post-transfer work is separate from image transfer:
+
+- Conditional EEPROM clearing uses configured **`eepe 0`**, checks the success
+  text, sends **`trst`**, and reconnects. The branch is controlled by
+  `WillClrEEprom`; a configuration flag alone does not prove that branch runs.
+- Conditional barcode restoration uses the saved pre-update identity, or asks
+  for one if unavailable. The supplied configuration enables this and names
+  **`tmbar`**, which is **not registered in either reviewed application image**.
+  Do not silently treat it as an alias of `tbar` or carry this configuration
+  into the Python client.
+- The tool finally rereads battery information. Transfer completion, reconnect,
+  optional clearing and identity restoration have separate outcomes; a single
+  UI completion event is not evidence that all succeeded.
+
+The image loader also distinguishes inputs: ZIP selection invokes board/device
+and version checks (`UpdateInfo.VerifyBinFile`, RVA **`0x6360`**), using version
+at file offset **`0x400`** and an 11-byte board field at **`0x418`**. The raw-bin
+branch of `Fill` opens the file directly and bypasses that ZIP-selection check.
+These are PC checks, not proof of receiver-side authentication or validation.
+
+The unused `Fill_Xmodem1k` method builds 1024-byte payloads with a two-byte CRC,
+but the frame assembler still hardcodes start byte `01`. It is not evidence
+that the battery accepts standard 1K/CRC mode. No active update path inspected
+here calls it. An implementation should follow the verified active framing,
+not choose a protocol variant from this method's name.
+
+Receiver flash ranges, image-integrity checks, duplicate-block handling,
+cancellation behavior, restart limits, and power-failure guarantees still need
+the matching bootloader or a validated protocol experiment. The findings above
+are a sender contract only; no firmware update was executed.

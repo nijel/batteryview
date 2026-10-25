@@ -190,7 +190,7 @@ acronyms and undocumented argument meanings are left unresolved.
 | `trst` | Soft system reset; E2 ultimately requests Cortex-M SYSRESETREQ. | L:U | L:U | V |
 | `shut` | Request shutdown; confirmation/repetition behavior must follow the handler. | L:U | L:U | V |
 | `tsoftdsg` | Run soft-discharge test routine; distinct from ordinary status reads. | L:D | L:D | V |
-| `updata` | Write bootloader marker and reset; transfer receiver is absent from these images. | L:U | L:U | V |
+| `updata` | Write bootloader marker and reset; PC transfer protocol is traced in the supplement, but the receiver is absent from these images. | L:U | L:U | V |
 
 ### Manufacturing and hardware tests
 
