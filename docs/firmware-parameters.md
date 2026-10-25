@@ -12,6 +12,9 @@ The [handler and persistence supplement](firmware-behavior.md) resolves the late
 record-query, callback, calibration, diagnostic and model-comparison findings.
 Analysis was static; none of these operations was tried on a battery. Remaining
 unknowns are called out rather than filled in from command names.
+[BatteryView's control descriptions](protocol.md#command-meanings-from-batteryviews-controls)
+add vendor UI meanings, model-specific workflows and known configuration defects;
+those application labels do not supersede the firmware contracts below.
 
 ## Reading the contracts
 
@@ -281,8 +284,8 @@ The other selector groups and their confirmed units/roles are:
 | Selectors | Meaning and parameter status |
 | --- | --- |
 | `bot botr bht bhtr blt bltr but butr` | Battery temperature protection/recovery fields, mC; exact cross-field/constant bounds and mirrored charge/discharge writes are in the supplement. |
-| `eot eotr eht ehtr elt eltr eut eutr` | Exact bounds are in the supplement, including the legacy-field comparison mismatch and asymmetric endpoints. |
-| `mot motr` | Exact mC bounds are in the supplement; physical sensor wiring remains a hardware question. |
+| `eot eotr eht ehtr elt eltr eut eutr` | Environment temperature protection/alarm and recovery fields, mC; BatteryView explicitly labels `eht/ehtr` as environment high-temperature alarm/release. Exact bounds are in the supplement, including the legacy-field comparison mismatch and asymmetric endpoints. |
+| `mot motr` | Board over-temperature protection/release according to BatteryView’s Forcel_C labels. Exact mC bounds are in the supplement; physical sensor wiring remains a hardware question. |
 | `coc coca cocar` | Charge current protection/alarm/recovery values, mA; exact predicates, including rejected zero recovery value, are in the supplement. |
 | `doc doca docar` | Discharge current protection/alarm/recovery values, **negative mA**; exact predicates and strict zero exclusion are in the supplement. |
 | `sc` | Short-circuit threshold, negative mA: **−300000 <= x < min(0, doc, −coc)**. Strictly below both related thresholds. |
@@ -387,9 +390,9 @@ other action strings are rejected except on the numeric PWM paths.
 | `pwmp` | Numeric parser clamps to **20000–200000**, but the E2 dispatch entry goes straight to the exit; no implemented effect. Do not infer frequency units or a working setter. |
 | `softstart` | Query reads GPIO. Both `on` and `off` reach a branch that compares the **argument count with 1**, instead of the parsed action. Since a setter has three total tokens, both take the same output-control path. Treat as a firmware bug, not a reliable Boolean setter. |
 | `i2c` | Bare target **clears bit 0 of I2C1 control register at 0x40005400**, disabling the peripheral; it is **not a status query**. The `on`/`off` forms do not reach that call. Helper `0x0802b958` has no restore step. |
-| `afuse` | Passes inverse on/off state to module callback operation `0x29`, then reports the cached AFUSE flag. The handler prints `Nonsupport currlimit mode` as well; persistent EEPROM markers/GPIO effects are now traced in the supplement; the physical circuit action remains board-specific. Bare target follows the same default-zero action path rather than a pure query. |
+| `afuse` | Passes inverse on/off state to module callback operation `0x29`, then reports the cached AFUSE flag. The handler prints `Nonsupport currlimit mode` as well; persistent EEPROM markers/GPIO effects are now traced in the supplement; the physical circuit action remains board-specific. BatteryView labels `ctrl afuse off` “Clear AFuse Error” and refers to a three-terminal fuse. Bare target follows the same default-zero action path rather than a pure query. |
 | `agelog` | Query reads EEPROM 0 `0x7b7`; marker `0x5a` enables the cached flag. Setter persists `0x5a` for on, zero for off. |
-| `mostest` | Query reads EEPROM 0 `0x7f4` and EEPROM 1 `0x2a`; either `0x5a` marker enables the cached flag. Setter writes both locations with `0x5a` or zero. The flag gates active background fault checks that can invoke AFUSE, record an event and persist state; see the supplement for thresholds and conditions. |
+| `mostest` | Query reads EEPROM 0 `0x7f4` and EEPROM 1 `0x2a`; either `0x5a` marker enables the cached flag. Setter writes both locations with `0x5a` or zero. The flag gates active background fault checks that can invoke AFUSE, record an event and persist state; see the supplement for thresholds and conditions. BatteryView first checks cell voltages and their sum before enabling it; its guard and parsing bug are documented in the protocol reference. |
 
 These observations are specific to E2 `0x08029500`–`0x08029bcc`. Display labels
 such as `CFETFLAG`, `DFETFLAG` and `dryct1`–`dryct4` are not additional selectors.

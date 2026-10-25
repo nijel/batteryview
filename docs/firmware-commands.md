@@ -401,6 +401,15 @@ mentioned. Shared names/help do not establish identical hardware effects.
   implement it. The supported session-exit command here is `logout`; that is
   not established as a substitute for the console-mode-switch operation.
 
+## BatteryView descriptions and application compatibility
+
+[BatteryView's control reference](protocol.md#command-meanings-from-batteryviews-controls)
+adds descriptions of protection/alarm/release selectors, AFUSE, ageing logging,
+current-sensor calibration, MOS-failure monitoring and model-specific UI actions.
+It also records XML command typos and the application's collection-addressing
+bug. Those are application findings, separate from this catalog's firmware
+registration evidence; do not treat every bundled script spelling as supported.
+
 ## Remaining work before implementation
 
 The [parameter reference](firmware-parameters.md) and
