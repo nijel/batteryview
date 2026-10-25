@@ -1,0 +1,17 @@
+name: Documentation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: python -m pip install uv
+      - run: uv sync --group docs --frozen
+      - run: uv run --group docs --frozen sphinx-build -n -W --keep-going -b html docs docs/_build/html
