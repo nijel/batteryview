@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from .errors import CommandCancelled, PylontechError
 from .models import CollectionResult
-from .transcript import report_filename
+from .transcript import filename_serial
 
 if TYPE_CHECKING:
     from .client import BatteryClient, Progress
@@ -103,7 +103,6 @@ def collect(
         directory.mkdir(parents=True, exist_ok=True)
         started = datetime.now(timezone.utc)
         run_id = f"{started:%Y%m%dT%H%M%SZ}_{uuid4().hex}"
-        manifest_path = directory / f"{run_id}_manifest.json"
         steps = [
             {"name": name, "status": "pending", "artifact": None, "records": None, "error": None}
             for name in ("identity", "history", "event", "snapshot")
@@ -119,29 +118,46 @@ def collect(
             "device": None,
             "steps": steps,
         }
-        _write_manifest(manifest_path, manifest, create=True)
+        # Resolve the prefix once, before publishing any named artifacts. Retain
+        # acquisition failures so they can be recorded in an UnknownSN manifest.
         identity = None
+        identity_error = None
+        try:
+            logger.debug("Collection step start step=%s", "identity")
+            if progress:
+                progress("identity", 0, 1)
+            identity = client.info()
+        except (Exception, KeyboardInterrupt) as exc:
+            identity_error = exc
+        prefix = f"{filename_serial(identity.barcode if identity else None)}_{run_id}"
+        manifest_path = directory / f"{prefix}_manifest.json"
+        if identity is not None:
+            manifest["device"] = asdict(identity)
+        # Exclusive creation is outside the failure handler: a collision must
+        # never lead to replacing a manifest belonging to a previous run.
+        _write_manifest(manifest_path, manifest, create=True)
         for index, step in enumerate(steps):
             name = step["name"]
             step["status"] = "running"
             _write_transition(manifest_path, manifest, index)
             artifact = None
             try:
-                logger.debug("Collection step start step=%s", name)
-                if progress:
+                if name != "identity":
+                    logger.debug("Collection step start step=%s", name)
+                if progress and name != "identity":
                     progress(name, 0, 1)
                 if name == "identity":
-                    artifact = directory / f"{run_id}_info.json"
-                    identity = client.info()
-                    manifest["device"] = asdict(identity)
+                    if identity_error is not None:
+                        raise identity_error
+                    artifact = directory / f"{prefix}_info.json"
                     _write_json(artifact, asdict(identity))
                 elif name in {"history", "event"}:
-                    artifact = directory / report_filename(identity.barcode, name)
+                    artifact = directory / f"{prefix}_{name}.txt"
                     export = client.export_history if name == "history" else client.export_events
                     report = export(artifact, progress=progress)
                     step["records"] = report.records
                 else:
-                    artifact = directory / f"{run_id}_snapshot.json"
+                    artifact = directory / f"{prefix}_snapshot.json"
                     _write_json(artifact, client.snapshot().to_dict())
                 step["artifact"] = artifact.name
                 if progress and name in {"identity", "snapshot"}:

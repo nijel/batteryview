@@ -8,16 +8,18 @@ Pylontech reports
 
 .. code:: sh
 
-   pylontech-console history --port /dev/ttyUSB0 --output history.txt.txt
-   pylontech-console event --port /dev/ttyUSB0 --output event.txt.txt
+   pylontech-console history --port /dev/ttyUSB0 --output history.txt
+   pylontech-console event --port /dev/ttyUSB0 --output event.txt
 
 On Windows, use a port such as ``--port COM3``. Full History/Event reports and SOC reset require
 a direct connection and reject ``--module``. Addressed identity and monitoring use explicit
 commands such as ``info 3`` and ``getpwr 3``; numbered login is not a substitute for addressing
 reads.
 
-Omit ``--output`` to derive a BatteryView-style filename from the barcode and local time.
-History and Event filenames end in ``.txt.txt``, matching the supplied files. Existing files are
+Omit ``--output`` to derive ``<barcode>_<history-or-event>_<timestamp>.txt``
+from the barcode and local time. New default names use a single ``.txt`` extension;
+older exports and BatteryView files ending in ``.txt.txt`` remain valid doctor
+inputs. Explicit output paths are used exactly as supplied. Existing files are
 never overwritten. Progress is written to stderr; stdout contains a JSON result with the path,
 record count, and response count.
 

@@ -15,7 +15,6 @@ from pylontech_tools import (
 )
 from pylontech_tools.cli import main
 from pylontech_tools.protocol import SHIFT_SEQUENCE, ConsoleSession, Response
-from pylontech_tools.transcript import report_filename
 
 FIXED_TIME = datetime(2000, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
@@ -28,11 +27,8 @@ def synthetic_clock(monkeypatch):
             return FIXED_TIME.astimezone(tz)
 
     monkeypatch.setattr("pylontech_tools.collection.datetime", Clock)
+    monkeypatch.setattr("pylontech_tools.client.datetime", Clock)
     monkeypatch.setattr("pylontech_tools.collection._application_version", lambda: "0.0.test")
-    monkeypatch.setattr(
-        "pylontech_tools.collection.report_filename",
-        lambda barcode, kind: report_filename(barcode, kind, now=FIXED_TIME),
-    )
 
 
 def response(command, body=""):
@@ -62,7 +58,10 @@ def report_exchanges(kind, *, barcode="TEST_A", address=8):
                 b"datalist history dtls 0\n",
                 response(
                     "datalist history dtls 0",
-                    "Item  Time  Vo(mV)  Cu(mA)  Tempr\r\r\n0  00-01-01  00:00:00  50000  -2000  20000",
+                    "Item  Time  Vo(mV)  Cu(mA)  Tempr\r\r\n"
+                    "0 00-01-01 00:00:00 50000 -2000 20000 20000 21000 3101 3102 "
+                    "Dischg Normal Normal Normal 0x0 Normal 50% 100000 "
+                    "0 3101 20000 Normal Normal 50% 1 3102 21000 Normal Normal 50%",
                 ),
             ),
             (b"\n", "\n\rpylon_debug>"),
@@ -126,8 +125,14 @@ def test_collection_uses_one_session_and_keeps_all_artifacts_flat(tmp_path, repl
     assert set(directory.iterdir()) == {*artifacts, result.manifest_path}
     assert all(path.is_file() and path.parent == directory for path in directory.iterdir())
     assert artifacts[0].name.endswith("_info.json")
-    assert artifacts[1].name == "TEST_A_history_20000102030405.txt.txt"
-    assert artifacts[2].name == "TEST_A_event_20000102030405.txt.txt"
+    prefix = f"TEST_A_{manifest['run_id']}"
+    assert result.manifest_path.name == f"{prefix}_manifest.json"
+    assert [p.name for p in artifacts] == [
+        f"{prefix}_info.json",
+        f"{prefix}_history.txt",
+        f"{prefix}_event.txt",
+        f"{prefix}_snapshot.json",
+    ]
     assert artifacts[3].name.endswith("_snapshot.json")
     assert manifest["steps"][1]["records"] == 1
     assert manifest["steps"][2]["records"] == 0
@@ -154,6 +159,106 @@ def test_collecting_different_modules_reuses_directory_without_changing_old_file
     assert read_manifest(second)["device"]["barcode"] == "TEST_B"
     assert len(list(directory.glob("*_manifest.json"))) == 2
     assert not any(p.is_dir() for p in directory.iterdir())
+
+
+def test_same_battery_collections_in_the_same_second_have_distinct_prefixes(tmp_path, replay):
+    directory = tmp_path / "support"
+    session, _ = replay(collection_exchanges())
+    first = BatteryClient(session=session).collect(directory)
+    original = {p.name: p.read_bytes() for p in directory.iterdir()}
+    session, _ = replay(collection_exchanges())
+    second = BatteryClient(session=session).collect(directory)
+    assert first.complete and second.complete
+    assert read_manifest(first)["started_at"] == read_manifest(second)["started_at"]
+    assert read_manifest(first)["run_id"] != read_manifest(second)["run_id"]
+    assert len(list(directory.iterdir())) == 10
+    assert all((directory / name).read_bytes() == data for name, data in original.items())
+
+
+def test_collection_sanitizes_barcode_in_every_artifact(tmp_path, replay):
+    session, _ = replay(collection_exchanges(barcode="TEST/A: B"))
+    result = BatteryClient(session=session).collect(tmp_path / "support")
+    assert result.complete
+    manifest = read_manifest(result)
+    assert manifest["device"]["barcode"] == "TEST/A: B"
+    prefix = f"TEST_A__B_{manifest['run_id']}_"
+    assert all(p.name.startswith(prefix) for p in result.directory.iterdir())
+
+
+def test_manifest_collision_does_not_replace_existing_collection(tmp_path, replay, monkeypatch):
+    from uuid import UUID
+
+    monkeypatch.setattr("pylontech_tools.collection.uuid4", lambda: UUID(int=1))
+    directory = tmp_path / "support"
+    session, _ = replay(collection_exchanges())
+    first = BatteryClient(session=session).collect(directory)
+    original = {p.name: p.read_bytes() for p in directory.iterdir()}
+    session, transport = replay([(b"info\n", info())])
+    with pytest.raises(FileExistsError):
+        BatteryClient(session=session).collect(directory)
+    assert first.complete and transport.writes == [b"info\n"]
+    assert set(p.name for p in directory.iterdir()) == set(original)
+    assert all((directory / name).read_bytes() == data for name, data in original.items())
+
+
+def test_identity_progress_cancellation_still_creates_an_unknown_manifest(tmp_path, replay):
+    session, transport = replay([])
+
+    def cancel(*args):
+        raise CommandCancelled("synthetic cancellation before identity")
+
+    with pytest.raises(CommandCancelled):
+        BatteryClient(session=session).collect(tmp_path / "support", progress=cancel)
+    path = next((tmp_path / "support").glob("*_manifest.json"))
+    manifest = json.loads(path.read_text())
+    assert path.name == f"UnknownSN_{manifest['run_id']}_manifest.json"
+    assert manifest["status"] == "interrupted" and manifest["device"] is None
+    assert [s["status"] for s in manifest["steps"]] == ["interrupted"] + ["skipped"] * 3
+    assert not transport.writes
+
+
+def test_doctor_reads_new_and_legacy_collections_together(tmp_path, replay):
+    from pylontech_tools import analyze_logs
+
+    directory = tmp_path / "support"
+    session, _ = replay(collection_exchanges())
+    legacy = BatteryClient(session=session).collect(directory)
+    manifest = read_manifest(legacy)
+    # Recreate the original layout using only synthetic collection content.
+    for step in manifest["steps"]:
+        old = directory / step["artifact"]
+        kind = step["name"]
+        filename = (
+            f"TEST_A_{kind}_20000102030405.txt.txt"
+            if kind in {"history", "event"}
+            else f"{manifest['run_id']}_{'info' if kind == 'identity' else kind}.json"
+        )
+        old.rename(directory / filename)
+        step["artifact"] = filename
+    legacy.manifest_path.unlink()
+    legacy_path = directory / f"{manifest['run_id']}_manifest.json"
+    legacy_path.write_text(json.dumps(manifest))
+    before = analyze_logs(directory)
+    assert len(before.batteries) == 1 and not before.input_issues
+    for kind in ("history", "event"):
+        path = next(directory.glob(f"TEST_A_{kind}_*.txt.txt"))
+        assert len(analyze_logs(path).batteries) == 1
+
+    session, _ = replay(collection_exchanges())
+    current = BatteryClient(session=session).collect(directory)
+    assert current.complete
+    assert len(analyze_logs(current.manifest_path).batteries) == 1
+    after = analyze_logs(directory)
+    assert not after.input_issues and len(after.batteries) == 1
+    assert (
+        after.batteries[0].metrics["observation_count"]
+        == before.batteries[0].metrics["observation_count"]
+    )
+    session, _ = replay(collection_exchanges(barcode="TEST_B"))
+    assert BatteryClient(session=session).collect(directory).complete
+    combined = analyze_logs(directory)
+    assert not combined.input_issues
+    assert {b.identity["barcode"] for b in combined.batteries} == {"TEST_A", "TEST_B"}
 
 
 def test_bundled_transcripts_equal_standalone_exports(tmp_path, replay):
@@ -238,11 +343,17 @@ def test_cancellation_finalizes_manifest_and_reraises(tmp_path, stage, error_typ
 
 
 def test_existing_report_collision_preserves_previous_run_and_does_not_claim_its_file(
-    tmp_path, replay
+    tmp_path, replay, monkeypatch
 ):
+    from uuid import UUID
+
     directory = tmp_path / "support"
     session, _ = replay(collection_exchanges())
     first = BatteryClient(session=session).collect(directory)
+    next_id = UUID(int=1)
+    monkeypatch.setattr("pylontech_tools.collection.uuid4", lambda: next_id)
+    collision = directory / f"TEST_A_20000102T030405Z_{next_id.hex}_history.txt"
+    collision.write_bytes(b"existing unrelated report")
     original = {p.name: p.read_bytes() for p in directory.iterdir()}
     session, transport = replay([(b"info\n", info())])
     second = BatteryClient(session=session).collect(directory)
@@ -281,7 +392,9 @@ def test_missing_barcode_keeps_vendor_unknown_sn_filenames(tmp_path, replay):
     result = BatteryClient(session=session).collect(tmp_path / "support")
     manifest = read_manifest(result)
     assert result.complete and manifest["device"]["barcode"] is None
-    assert manifest["steps"][1]["artifact"] == "UnknownSN_history_20000102030405.txt.txt"
+    prefix = f"UnknownSN_{manifest['run_id']}"
+    assert result.manifest_path.name == f"{prefix}_manifest.json"
+    assert manifest["steps"][1]["artifact"] == f"{prefix}_history.txt"
 
 
 def test_manifest_replacement_is_atomic_and_records_step_transitions(tmp_path, replay, monkeypatch):
@@ -378,7 +491,7 @@ def test_cancellation_during_manifest_updates_records_interruption(
     step_index = 0 if transition == "start" else 3
     assert manifest["steps"][step_index]["status"] == "interrupted"
     if transition == "start":
-        assert not transport.writes
+        assert transport.writes == [b"info\n"]
         assert all(s["status"] == "skipped" for s in manifest["steps"][1:])
     else:
         assert len(list(directory.iterdir())) == 5

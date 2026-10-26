@@ -57,6 +57,11 @@ and missing manifest artifacts are reported while usable files remain available.
 Manifest references must stay inside the input directory and cannot use symlinks.
 A manifest supplied individually loads only that run's referenced artifacts.
 
+Both current collection filenames (a shared barcode/UTC/UUID prefix and a single
+``.txt`` extension) and legacy layouts, including ``.txt.txt`` reports, are
+accepted. They can coexist in one directory. Manifest references and file
+contents determine associations; filenames do not establish battery identity.
+
 Files are combined by verified barcode from embedded identity or a manifest.
 Filenames and module addresses do not establish identity. Repeated collections
 of the same battery contribute historical evidence, with duplicate records and

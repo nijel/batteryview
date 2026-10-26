@@ -18,16 +18,29 @@ directory. Complete support exports through addressed module selection are not v
 The directory is created if needed and may already contain earlier collections. All artifacts
 are written directly into it:
 
-- ``<run-id>_info.json``: device identity and firmware fields.
-- ``<barcode>_history_<timestamp>.txt.txt``: BatteryView-compatible History transcript.
-- ``<barcode>_event_<timestamp>.txt.txt``: BatteryView-compatible Event transcript.
-- ``<run-id>_snapshot.json``: the ordinary JSON snapshot, including raw responses.
-- ``<run-id>_manifest.json``: status, identity, file references, and report counts for this run.
+- ``<barcode>_<run-id>_info.json``: device identity and firmware fields.
+- ``<barcode>_<run-id>_history.txt``: BatteryView-compatible History transcript.
+- ``<barcode>_<run-id>_event.txt``: BatteryView-compatible Event transcript.
+- ``<barcode>_<run-id>_snapshot.json``: the ordinary JSON snapshot, including raw responses.
+- ``<barcode>_<run-id>_manifest.json``: status, identity, file references, and report counts.
 
-Each run ID combines its UTC start time with a random identifier. Earlier files are never
-overwritten. Reports retain their existing filename convention and use ``UnknownSN`` when no
-barcode is available. A report filename collision fails that step rather than replacing a file
-from an earlier run.
+Each run ID combines its UTC start time and a random UUID, for example
+``20000102T030405Z_0123456789abcdef0123456789abcdef``. Every artifact from one run
+shares the same barcode/run prefix. Characters outside letters, digits,
+underscores, plus and minus signs are replaced with underscores in the filename;
+the original barcode remains in the contents. Missing barcodes use ``UnknownSN``.
+Repeated collections of the same battery within one second have distinct run IDs.
+Earlier files are never overwritten; an artifact collision fails that step.
+
+The initial identity read determines the prefix before the manifest is created.
+If that read fails or is interrupted, an ``UnknownSN`` manifest records the
+outcome and skipped steps. Manifest creation failures propagate without replacing
+an existing manifest. No files are renamed midway through collection.
+
+Manifest format version 1 and transcript contents are unchanged. Doctor accepts
+both this layout and older collections with run-only JSON filenames and
+``<barcode>_history_<timestamp>.txt.txt`` or Event equivalents. Existing files
+need no renaming, and both layouts can coexist in the same directory.
 
 Collection stops at the first failed step. Completed files and partial report files remain, and
 subsequent steps are marked ``skipped``. The per-run manifest is updated atomically as work

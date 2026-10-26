@@ -26,19 +26,21 @@ def stat(count=0, events=0):
     return reply(f"stat\n\r@\r\r\nHisData Items : {count}\r\r\nData Items : {events}\rpylon_debug>")
 
 
-def test_empty_event_exact_bytes_and_no_pagination(tmp_path, replay):
+@pytest.mark.parametrize("filename", ["event.txt", "event.txt.txt"])
+def test_empty_event_exact_bytes_and_no_pagination(tmp_path, replay, filename):
     exchanges = [
         (b"info\n", INFO),
         (b"stat\n", stat().text),
         (b"data event\n", "data event\n\r@\r\n\r$$\r\n\rpylon_debug>"),
     ]
     session, transport = replay(exchanges)
-    path = tmp_path / "event.txt.txt"
+    path = tmp_path / filename
     result = BatteryClient(session=session).export_events(path)
     expected = codecs.BOM_UTF16_LE + "".join(text + "\r\n" for _, text in exchanges).encode(
         "utf-16-le"
     )
     assert path.read_bytes() == expected
+    assert result.path == path
     assert result.records == 0 and result.responses == 3 and result.complete
     assert not transport.exchanges
 
@@ -213,11 +215,33 @@ def test_writer_never_overwrites(tmp_path):
     assert path.read_bytes() == b"original"
 
 
-def test_vendor_filename_quirks():
+def test_report_filenames_use_single_extension_and_retain_reset_naming():
     now = datetime(2000, 1, 2, 3, 4, 5)
-    assert report_filename("TEST123", "event", now=now) == "TEST123_event_20000102030405.txt.txt"
+    assert report_filename("TEST123", "event", now=now) == "TEST123_event_20000102030405.txt"
+    assert report_filename("TEST123", "history", now=now) == "TEST123_history_20000102030405.txt"
     assert report_filename("TEST123", "resetsoc", now=now) == "TEST123_resetsoc _20000102030405.txt"
     assert report_filename(None, "resetsoc", now=now) == "UnknownSN_resetsoc_20000102030405.txt"
+
+
+@pytest.mark.parametrize("kind", ["history", "event"])
+def test_automatic_export_paths_use_single_extension(tmp_path, monkeypatch, kind):
+    from functools import partial
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "pylontech_tools.client.report_filename",
+        partial(report_filename, now=datetime(2000, 1, 2, 3, 4, 5)),
+    )
+    session = ScriptedSession(
+        [("info", reply(INFO)), ("info", reply(INFO)), ("stat", stat()), (f"data {kind}", reply())]
+    )
+    client = BatteryClient(session=session)
+    export = client.export_history if kind == "history" else client.export_events
+    result = export()
+    assert result.complete
+    assert result.path.name == f"TEST123_{kind}_20000102030405.txt"
+    assert list(tmp_path.iterdir()) == [tmp_path / result.path]
+    assert result.path.read_bytes().startswith(codecs.BOM_UTF16_LE)
 
 
 def split_reference_frames(text):

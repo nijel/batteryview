@@ -7,14 +7,18 @@ from datetime import datetime
 from pathlib import Path
 
 
+def filename_serial(barcode: str | None) -> str:
+    """Make a barcode safe for a filename without treating it as verified identity."""
+    return re.sub(r"[^a-zA-Z0-9_+-]", "_", barcode or "UnknownSN")
+
+
 def report_filename(barcode: str | None, kind: str, *, now: datetime | None = None) -> str:
     if kind not in {"history", "event", "resetsoc"}:
         raise ValueError(f"Unknown report kind: {kind}")
-    serial = re.sub(r"[^a-zA-Z0-9_+-]", "_", barcode or "UnknownSN")
+    serial = filename_serial(barcode)
     timestamp = (now or datetime.now()).strftime("%Y%m%d%H%M%S")
     middle = "resetsoc " if kind == "resetsoc" and barcode else kind
-    suffix = ".txt" if kind == "resetsoc" else ".txt.txt"
-    return f"{serial}_{middle}_{timestamp}{suffix}"
+    return f"{serial}_{middle}_{timestamp}.txt"
 
 
 class TranscriptWriter:

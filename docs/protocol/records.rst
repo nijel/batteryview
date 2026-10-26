@@ -268,8 +268,10 @@ prepend commands: command echoes come from the console itself. Recovery metadata
 UTF-8 JSON file.
 
 The History/Event button handlers append ``.txt`` to the selected filename, explaining
-``.txt.txt`` in the supplied reports. The reset button embeds a space in ``_resetsoc _``; both
-quirks are retained in generated default filenames.
+``.txt.txt`` in the supplied reports. The Python exporter now uses a single
+``.txt`` extension for new History/Event default names; transcript bytes are
+unchanged. The reset button embeds a space in ``_resetsoc _``, which is retained
+in standalone reset default filenames. Doctor accepts both text-file extensions.
 
 .. _protocol-support-collection-wrapper:
 
