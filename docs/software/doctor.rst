@@ -131,8 +131,12 @@ performed or prescribed by the screening rules.
 Output and exit status
 ----------------------
 
-Text is the default and shows a short summary per battery, important findings,
-and data limitations. Use JSON for all findings and their source references:
+Text is the default. It groups measurements into short lines and shows warnings,
+errors, and limitations affecting the available evidence. Long messages wrap
+without truncation. Informational findings, the raw historical fault inventory,
+and routine notes about unassigned rack entries or unproven balancing difficulty
+are available in JSON rather than repeated in each text summary.
+Use JSON for all findings and their source references:
 
 .. code-block:: sh
 

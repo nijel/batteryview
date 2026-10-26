@@ -144,7 +144,7 @@ def test_single_report_encodings_and_historical_summary(tmp_path, encoding):
     assert battery.metrics["reported_soh_pct"] == 99
     assert battery.metrics["as_of"] == "historical_record"
     assert "Historical evidence only" in " ".join(battery.limitations)
-    assert "historical_record" in format_doctor(result)
+    assert "Measurements: historical record" in format_doctor(result)
 
 
 @pytest.mark.parametrize(
@@ -816,3 +816,39 @@ def test_labeled_system_fault_does_not_use_indicator_mapping(tmp_path):
     source.write_text(json.dumps(data))
     result = analyze_logs(path)
     assert "fault_mask" in codes(result) and "indicator_fault" not in codes(result)
+
+
+def test_text_summary_prioritizes_actionable_findings_and_preserves_full_messages(tmp_path):
+    from pylontech_tools.models import DoctorFinding
+
+    result = analyze_logs(bundle(tmp_path))
+    battery = result.batteries[0]
+    message = "Investigate the recorded communication condition. " * 12 + "Final evidence."
+    battery.findings[:] = [
+        DoctorFinding("historical_counters", "info", "Generic counter disclaimer", []),
+        DoctorFinding("historical_faults", "info", "Repeated raw fault inventory", []),
+        DoctorFinding("historical_system_fault", "warning", message, []),
+    ]
+    battery.limitations[:] = [
+        "Auxiliary rack entries without verified barcodes are not attributed to other batteries.",
+        "Balancing difficulty is unproven: qualifying evidence absent.",
+        "Some observations have incomplete cell coverage.",
+    ]
+    text = format_doctor(result)
+    assert "Generic counter disclaimer" not in text
+    assert "Repeated raw fault inventory" not in text
+    assert "Auxiliary rack" not in text and "Balancing difficulty is unproven" not in text
+    assert "incomplete cell coverage" in text
+    assert "Final evidence." in " ".join(text.split()) and "WARNING:" in text
+    assert all(len(line) <= 88 for line in text.splitlines() if not line.startswith("TEST_"))
+    assert "--format json" in text
+    data = result.to_dict()
+    assert len(data["batteries"][0]["findings"]) == 3
+    assert len(data["batteries"][0]["limitations"]) == 3
+
+
+def test_text_summary_keeps_all_material_limitations(tmp_path):
+    result = analyze_logs(bundle(tmp_path))
+    result.batteries[0].limitations[:] = [f"Missing evidence category {i}." for i in range(5)]
+    text = format_doctor(result)
+    assert all(f"Missing evidence category {i}." in text for i in range(5))

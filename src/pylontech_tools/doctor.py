@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from textwrap import wrap
 
 from .doctor_inputs import BatteryEvidence, EvidenceReader, Observation
 from .faults import SYSTEM_FIELDS, decode_faults, describe_faults, fault_severity
@@ -539,8 +540,13 @@ def analyze_logs(path: str | Path, *, imbalance_mv: int = 100) -> DoctorReport:
 
 
 def format_doctor(report: DoctorReport) -> str:
-    """Render short per-battery summaries with bounded findings and limitations."""
+    """Render actionable findings; retain diagnostic detail in the JSON report."""
     lines = [f"Battery doctor: {report.status.replace('_', ' ')}"]
+    hidden_details = False
+
+    def append_wrapped(message: str, prefix: str = "  ") -> None:
+        lines.extend(wrap(message, width=88, initial_indent=prefix, subsequent_indent="    "))
+
     for battery in report.batteries:
         ident, m = battery.identity, battery.metrics
         lines.extend(
@@ -549,46 +555,66 @@ def format_doctor(report: DoctorReport) -> str:
                 f"{ident.get('barcode') or battery.key} ({ident.get('model') or 'unknown model'}): {battery.status.replace('_', ' ')}",
             ]
         )
-        values = [
-            ("SOC", m.get("soc_pct"), "%"),
-            ("SOH (reported)", m.get("reported_soh_pct"), "%"),
-            ("voltage", m.get("voltage_v"), " V"),
-            ("current", m.get("current_a"), " A"),
-            ("cell spread", m.get("cell_spread_mv"), " mV"),
-            ("recorded max", m.get("max_recorded_cell_spread_mv"), " mV"),
-            ("cycles", m.get("cycle_count"), ""),
+        groups = [
+            [
+                ("SOC", "soc_pct", "%"),
+                ("SOH (reported)", "reported_soh_pct", "%"),
+                ("cycles", "cycle_count", ""),
+            ],
+            [("Voltage", "voltage_v", " V"), ("current", "current_a", " A")],
+            [
+                ("Cell spread", "cell_spread_mv", " mV"),
+                ("recorded max", "max_recorded_cell_spread_mv", " mV"),
+            ],
         ]
-        lines.append(
-            "  "
-            + ", ".join(
-                f"{label} {value:g}{unit}" for label, value, unit in values if value is not None
+        measured = False
+        for group in groups:
+            values = [
+                f"{label} {m[key]:g}{unit}" for label, key, unit in group if m.get(key) is not None
+            ]
+            if values:
+                append_wrapped(" | ".join(values))
+                measured = True
+        if not measured:
+            lines.append("  No usable measurements")
+        if m.get("min_cell_voltage_v") is not None and m.get("max_cell_voltage_v") is not None:
+            append_wrapped(
+                f"Cells {m['min_cell_voltage_v']:g}–{m['max_cell_voltage_v']:g} V"
+                + (
+                    f" | lowest #{m['lowest_cell_index']}, highest #{m['highest_cell_index']} (zero-based)"
+                    if m.get("lowest_cell_index") is not None
+                    and m.get("highest_cell_index") is not None
+                    else ""
+                )
             )
-            if any(v is not None for _, v, _ in values)
-            else "  No usable measurements"
+        if m.get("as_of"):
+            kind = m["as_of"].replace("_", " ")
+            stamp = m.get("battery_timestamp") or m.get("acquired_at") or "undated"
+            append_wrapped(f"Measurements: {kind}, {stamp}")
+        findings = sorted(
+            (f for f in battery.findings if f.severity != "info"),
+            key=lambda f: {"error": 0, "warning": 1}[f.severity],
         )
-        if m.get("cell_spread_mv") is not None:
-            if m.get("min_cell_voltage_v") is not None and m.get("max_cell_voltage_v") is not None:
-                lines.append(
-                    f"  Cell voltage range {m['min_cell_voltage_v']:g}–{m['max_cell_voltage_v']:g} V"
+        hidden_details |= len(findings) != len(battery.findings)
+        if findings:
+            lines.append("")
+        for finding in findings[:5]:
+            append_wrapped(f"{finding.severity.upper()}: {finding.message}")
+        if len(findings) > 5:
+            lines.append(f"  {len(findings) - 5} additional warnings/errors; see JSON output.")
+            hidden_details = True
+        for limitation in battery.limitations:
+            if limitation.startswith(
+                (
+                    "Auxiliary rack entries without verified barcodes",
+                    "Balancing difficulty is unproven:",
                 )
-            if m.get("lowest_cell_index") is not None:
-                lines.append(
-                    f"  Lowest cell {m['lowest_cell_index']}; highest cell {m['highest_cell_index']} (zero-based)"
-                )
-            lines.append(
-                f"  Evidence: {m.get('as_of', 'unknown')} {m.get('battery_timestamp') or m.get('acquired_at') or '(undated)'}"
-            )
-        for finding in sorted(
-            battery.findings, key=lambda f: {"error": 0, "warning": 1, "info": 2}[f.severity]
-        )[:5]:
-            message = finding.message[:350]
-            lines.append(f"  {finding.severity.upper()}: {message}")
-        if len(battery.findings) > 5:
-            lines.append(
-                f"  {len(battery.findings) - 5} additional findings; use --format json for full evidence."
-            )
-        for limitation in battery.limitations[:3]:
-            lines.append(f"  Note: {limitation}")
+            ):
+                hidden_details = True
+                continue
+            append_wrapped(f"Note: {limitation}")
+    if hidden_details:
+        lines.append("\nUse --format json for all findings, notes, and source references.")
     if report.input_issues:
         lines.append(f"\nInput/acquisition issues: {len(report.input_issues)}")
         for issue in report.input_issues[:3]:
