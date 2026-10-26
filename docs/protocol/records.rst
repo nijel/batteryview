@@ -94,6 +94,9 @@ Recorded data, logs and counters
 |                                               | found in the handler.                         |
 +-----------------------------------------------+-----------------------------------------------+
 
+For the calculation and persistence of ``SOH``, ``CYCLE Times``, and ``Dsg Cap``,
+see :doc:`health`.
+
 Supported record kinds advertised by the firmware are ``event``, ``history``, ``pov``, ``puv``,
 ``plv``, ``bov``, ``buv``, ``inputov``, ``coc``, ``coca``, ``doc``, ``doca``, ``sc``, ``use``.
 The ``use`` path also reports an interval in days. Internal ``log`` is a different ring from

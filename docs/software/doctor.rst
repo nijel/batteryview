@@ -124,9 +124,13 @@ that a nonzero detailed code was unavailable, rather than inventing a bit meanin
 Operational shutdown/reset flags alone are informational, not hardware diagnoses.
 
 SOH is shown as reported by the BMS. Cycle counts prefer statistics when available.
-Doctor does not estimate remaining life, usable capacity, or the meaning of a
-model's uninitialized SOH value. No charging, repair, or configuration changes are
-performed or prescribed by the screening rules.
+The reviewed firmware derives SOH from accumulated discharge cycles using a fixed
+aging formula, rather than a capacity test; see :doc:`/protocol/health`. Clearing
+statistics can discard accumulated throughput and change the resulting estimate.
+A reported zero is preserved, but its meaning is unresolved when it disagrees
+with the reviewed calculation. Doctor does not estimate remaining life or usable
+capacity. No charging, repair, or configuration changes are performed or
+prescribed by the screening rules.
 
 Output and exit status
 ----------------------

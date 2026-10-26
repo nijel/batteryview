@@ -651,6 +651,9 @@ displayed value remains zero after restart.
 |                          |                   |                          | SOC/counter storage.           |
 +--------------------------+-------------------+--------------------------+--------------------------------+
 
+The :doc:`SOH and cycle accounting chapter <health>` explains the discharge
+integration, cycle-derived SOH formula, and consequences of clearing these fields.
+
 The erased statistics block also contains charge/discharge and fault counters. Chip 0 holds
 additional metadata/settings, so this procedure should be described as clearing a persistence
 area used by SOC and diagnostics, not a narrowly scoped percentage reset. There is a separate

@@ -15,6 +15,11 @@ specifically ``PylonSerialPort``, ``MsgBackgroundWorker``, ``HistoryGetInfo``, `
 and the History-window button handlers. The Python package does not execute or depend on the
 vendor assembly or its DLLs.
 
+The :doc:`SOH and cycle accounting chapter <health>` traces the shared accounting
+routine, integer formulas, display fields, and persistence paths in both reviewed
+images. Its examples use synthetic inputs; private recordings are only a local
+consistency check, not the source of the documented formulas.
+
 The private reference recordings cover History, Event, and SOC reset workflows. Device
 identities, firmware inventories, timestamps, counters, and raw telemetry remain in the local
 recordings, not in distributed fixtures. The recordings contain some truncated device text. Raw

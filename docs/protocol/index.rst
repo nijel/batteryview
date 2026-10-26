@@ -61,6 +61,7 @@ application's labels and command sequences from firmware behavior.
    commands
    records
    faults
+   health
    configuration
    calibration
    storage
