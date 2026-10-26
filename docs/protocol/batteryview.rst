@@ -270,9 +270,11 @@ Index Mask      Vendor label, paraphrased
 ===== ========= =====================================================
 
 The UP2500 indicator file additionally names index 12 (``0x1000``) as fuse failure. These are
-vendor UI meanings for that configured field/profile. They do not establish that an event’s
-``System Fault``, a ``pwr`` event mask, and every firmware’s ``getpwr`` trailer share the same
-bit layout. Preserve the source and raw value before applying a label.
+vendor UI meanings for that configured field/profile. The configuration alone does not
+establish a shared layout for an event's ``System Fault``, a ``pwr`` event mask, and
+every firmware's ``getpwr`` trailer. :doc:`Fault-word tracing <faults>` now proves
+which E2/C fields share the module word and identifies differences from these UI
+labels. Preserve the source and raw value before applying a label.
 
 .. _protocol-configuration-defects-and-unsupported-model-commands:
 

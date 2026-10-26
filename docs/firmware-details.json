@@ -6,6 +6,97 @@
       "sha256": "5450e3bd884ae63549fc3b278ecccc0126227234f7148c7961542755cbad2d7d",
       "initialized_ram_size": 4479,
       "initialized_ram_sha256": "ef03b99d5f6ff4e6beff3cde17dd8a3d293b61d8e1e149db8799a3c64f611147",
+      "system_fault": {
+        "module_word_offset": "0x40",
+        "record_word_offset": "0x3c",
+        "record_copy_address": "0x080074a8",
+        "display_flags": [
+          {
+            "mask": "0x1",
+            "label": "RV",
+            "check_address": "0x08008852",
+            "label_address": "0x080088f4"
+          },
+          {
+            "mask": "0x2",
+            "label": "DCOV",
+            "check_address": "0x0800883a",
+            "label_address": "0x08036e48"
+          },
+          {
+            "mask": "0x4",
+            "label": "Rtc eer",
+            "check_address": "0x08008792",
+            "label_address": "0x08036ec0"
+          },
+          {
+            "mask": "0x8",
+            "label": "lock eer",
+            "check_address": "0x080087a0",
+            "label_address": "0x08036eb4"
+          },
+          {
+            "mask": "0x20",
+            "label": "TMPR err",
+            "check_address": "0x0800882e",
+            "label_address": "0x08036e50"
+          },
+          {
+            "mask": "0x40",
+            "label": "VOLT err",
+            "check_address": "0x08008816",
+            "label_address": "0x08036e5c"
+          },
+          {
+            "mask": "0x100",
+            "label": "ADDR err",
+            "check_address": "0x0800880a",
+            "label_address": "0x08036e68"
+          },
+          {
+            "mask": "0x1000",
+            "label": "34Z100 err",
+            "check_address": "0x080087f2",
+            "label_address": "0x08036e74"
+          },
+          {
+            "mask": "0x2000",
+            "label": "LTC err",
+            "check_address": "0x080087e6",
+            "label_address": "0x08036e80"
+          },
+          {
+            "mask": "0x4000",
+            "label": "eep eer",
+            "check_address": "0x080087d0",
+            "label_address": "0x08036e8c"
+          },
+          {
+            "mask": "0x8000",
+            "label": "flash eer",
+            "check_address": "0x080087c4",
+            "label_address": "0x08036e94"
+          },
+          {
+            "mask": "0x10000",
+            "label": "bat eer",
+            "check_address": "0x080087b8",
+            "label_address": "0x08036ea0"
+          },
+          {
+            "mask": "0x20000",
+            "label": "afuse eer",
+            "check_address": "0x080087ac",
+            "label_address": "0x08036ea8"
+          }
+        ],
+        "peer_presence_0x200": {
+          "set_address": "0x080143ac",
+          "clear_address": "0x080143b8",
+          "presence_check_address": "0x08016f88",
+          "consecutive_absent_checks": 5
+        }
+      },
       "gauge_fields": [
         {
           "name": "Taper Current",
@@ -376,6 +467,97 @@
       "sha256": "897c3326ab8905df75a7297905112958a07c0a2cbb0592e0ecc274b886b0c82e",
       "initialized_ram_size": 3471,
       "initialized_ram_sha256": "e0fa6b7bf4973fb32f8f320bc28662f3fde51076a88d92a32cc5487153b3f7da",
+      "system_fault": {
+        "module_word_offset": "0x40",
+        "record_word_offset": "0x3c",
+        "record_copy_address": "0x08007490",
+        "display_flags": [
+          {
+            "mask": "0x1",
+            "label": "RV",
+            "check_address": "0x0800888a",
+            "label_address": "0x08008940"
+          },
+          {
+            "mask": "0x2",
+            "label": "DCOV",
+            "check_address": "0x0800887e",
+            "label_address": "0x08032724"
+          },
+          {
+            "mask": "0x4",
+            "label": "Rtc eer",
+            "check_address": "0x080087e0",
+            "label_address": "0x0803279c"
+          },
+          {
+            "mask": "0x8",
+            "label": "lock eer",
+            "check_address": "0x080087ee",
+            "label_address": "0x08032790"
+          },
+          {
+            "mask": "0x20",
+            "label": "TMPR err",
+            "check_address": "0x08008872",
+            "label_address": "0x0803272c"
+          },
+          {
+            "mask": "0x40",
+            "label": "VOLT err",
+            "check_address": "0x08008866",
+            "label_address": "0x08032738"
+          },
+          {
+            "mask": "0x100",
+            "label": "ADDR err",
+            "check_address": "0x0800885a",
+            "label_address": "0x08032744"
+          },
+          {
+            "mask": "0x1000",
+            "label": "CurrIC err",
+            "check_address": "0x0800884e",
+            "label_address": "0x08032750"
+          },
+          {
+            "mask": "0x2000",
+            "label": "LTC err",
+            "check_address": "0x08008842",
+            "label_address": "0x0803275c"
+          },
+          {
+            "mask": "0x4000",
+            "label": "eep eer",
+            "check_address": "0x0800882a",
+            "label_address": "0x08032768"
+          },
+          {
+            "mask": "0x8000",
+            "label": "flash eer",
+            "check_address": "0x0800881e",
+            "label_address": "0x08032770"
+          },
+          {
+            "mask": "0x10000",
+            "label": "bat eer",
+            "check_address": "0x08008806",
+            "label_address": "0x0803277c"
+          },
+          {
+            "mask": "0x20000",
+            "label": "afuse eer",
+            "check_address": "0x080087fa",
+            "label_address": "0x08032784"
+          }
+        ],
+        "peer_presence_0x200": {
+          "set_address": "0x080145ac",
+          "clear_address": "0x080145b8",
+          "presence_check_address": "0x0801716a",
+          "consecutive_absent_checks": 5
+        }
+      },
       "weekdays": [
         "Mon",
         "Tue",

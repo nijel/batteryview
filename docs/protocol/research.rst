@@ -83,7 +83,8 @@ extractor <https://github.com/nijel/pylontech-tools/blob/main/scripts/extract_fi
 checks the same reviewed hashes as the command extractor, reconstructs bounded initialized-data
 streams and emits the :download:`detail metadata </firmware-details.json>`: weekday labels, all
 38 C gauge descriptors, initialized-data fingerprints and programming-script
-counts/targets/delays/fingerprint. It emits **no programming payloads, RAM contents or original
+counts/targets/delays/fingerprint, and source-checked system-fault display labels
+and evidence addresses described in :doc:`faults`. It emits **no programming payloads, RAM contents or original
 logs**.
 
 .. code:: sh

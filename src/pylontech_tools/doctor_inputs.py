@@ -502,7 +502,7 @@ class EvidenceReader:
         return {
             k: v
             for k, v in fields.items()
-            if k in {"System Fault", "Power Events", "Bat Events", "SysErrCode"}
+            if k in {"System Fault", "Power Events", "Bat Events", "SysErrCode", "ErrCode"}
         }
 
     def text_input(
@@ -685,13 +685,14 @@ class EvidenceReader:
                     states=states,
                     cells=cells,
                 )
-                masks = (
-                    {"System Fault": values[-1]}
-                    if re.fullmatch(r"0[xX][0-9a-fA-F]+", values[-1])
-                    else {}
+                summary_masks = (
+                    [v for v in values[12:] if re.fullmatch(r"0[xX][0-9a-fA-F]+", v)]
+                    if not cells
+                    else []
                 )
+                masks = {"SysErrCode": summary_masks[-1]} if summary_masks else {}
                 if cells and re.fullmatch(r"0[xX][0-9a-fA-F]+", values[11]):
-                    masks["Recorded event code"] = values[11]
+                    masks["ErrCode"] = values[11]
                 stamp = battery_time(f"{match[2]} {match[3]}")
                 complete = (
                     all(v is not None for v in (voltage, low, high))
@@ -768,8 +769,8 @@ def string_map(value: object) -> dict[str, str]:
 def expanded_cells(values: list[str], expected: int | None) -> list[CellReading]:
     """Detailed rows have 15 scalar tokens, then six tokens per cell.
 
-    The scalar prefix contains opaque codes; it must not be decoded as the hash
-    monitoring trailer. Cells are index/voltage/temperature/voltage-state/
+    The scalar prefix includes the recorded ErrCode; it has a different layout
+    from the hash monitoring trailer. Cells are index/voltage/temperature/voltage-state/
     temperature-state/SOC. Consecutive zero- or one-based IDs are normalized to
     zero-based indices, retaining the device's original cell ID in raw fields.
     """

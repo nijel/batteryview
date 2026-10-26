@@ -60,6 +60,7 @@ application's labels and command sequences from firmware behavior.
    console
    commands
    records
+   faults
    configuration
    calibration
    storage

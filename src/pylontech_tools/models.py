@@ -129,6 +129,7 @@ class DoctorFinding:
     message: str
     evidence: list[str] = field(default_factory=list)
     certainty: str = "observed"
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -152,7 +153,7 @@ class DoctorReport:
     input_issues: list[dict[str, str]] = field(default_factory=list)
     imbalance_mv: int = 100
     schema_version: int = 1
-    rules_version: int = 1
+    rules_version: int = 2
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

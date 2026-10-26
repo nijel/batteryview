@@ -152,6 +152,84 @@ def script_metadata(data: bytes, ram: bytes) -> dict:
     }
 
 
+def fault_display_entry(data: bytes, check: int, label_load: int) -> dict:
+    """Decode a reviewed Thumb LSLS/BPL display bit and its literal/ADR label."""
+    try:
+        shift, branch = struct.unpack_from("<HH", data, check - IMAGE_BASE)
+        if shift & 0xF800 or not (shift >> 6) & 31 or branch & 0xFF00 != 0xD500:
+            raise ValueError("Fault display is not the reviewed LSLS/BPL test")
+        first, second = struct.unpack_from("<HH", data, label_load - IMAGE_BASE)
+        pc = (label_load + 4) & ~3
+        if first == 0xF8DF:
+            pool = pc + (second & 0xFFF)
+            pointer = struct.unpack_from("<I", data, pool - IMAGE_BASE)[0]
+        elif first & 0xF800 == 0xA000:
+            pointer = pc + (first & 255) * 4
+        else:
+            raise ValueError("Fault display label is not a reviewed literal or ADR")
+        label = c_string(data, pointer).strip()
+    except struct.error as exc:
+        raise ValueError("Truncated fault display evidence") from exc
+    return {
+        "mask": f"0x{1 << (31 - ((shift >> 6) & 31)):x}",
+        "label": label,
+        "check_address": f"0x{check:08x}",
+        "label_address": f"0x{pointer:08x}",
+    }
+
+
+def system_fault_metadata(data: bytes, name: str) -> dict:
+    if name == "US_E2_V2.5_Crc.bin":
+        checks = (
+            (0x080087E0, 0x080087E4),
+            (0x080087EE, 0x080087F2),
+            (0x080087FA, 0x080087FE),
+            (0x08008806, 0x0800880A),
+            (0x0800881E, 0x08008822),
+            (0x0800882A, 0x0800882E),
+            (0x08008842, 0x08008846),
+            (0x0800884E, 0x08008852),
+            (0x0800885A, 0x0800885E),
+            (0x08008866, 0x0800886A),
+            (0x08008872, 0x08008876),
+            (0x0800887E, 0x08008882),
+            (0x0800888A, 0x0800888E),
+        )
+        copy, mask_set, mask_clear, presence = 0x08007490, 0x080145AC, 0x080145B8, 0x0801716A
+    else:
+        checks = (
+            (0x08008792, 0x08008796),
+            (0x080087A0, 0x080087A4),
+            (0x080087AC, 0x080087B0),
+            (0x080087B8, 0x080087BC),
+            (0x080087C4, 0x080087C8),
+            (0x080087D0, 0x080087D4),
+            (0x080087E6, 0x080087EA),
+            (0x080087F2, 0x080087F6),
+            (0x0800880A, 0x0800880E),
+            (0x08008816, 0x0800881A),
+            (0x0800882E, 0x08008832),
+            (0x0800883A, 0x0800883E),
+            (0x08008852, 0x08008856),
+        )
+        copy, mask_set, mask_clear, presence = 0x080074A8, 0x080143AC, 0x080143B8, 0x08016F88
+    return {
+        "module_word_offset": "0x40",
+        "record_word_offset": "0x3c",
+        "record_copy_address": f"0x{copy:08x}",
+        "display_flags": sorted(
+            (fault_display_entry(data, a, b) for a, b in checks),
+            key=lambda row: int(row["mask"], 16),
+        ),
+        "peer_presence_0x200": {
+            "set_address": f"0x{mask_set:08x}",
+            "clear_address": f"0x{mask_clear:08x}",
+            "presence_check_address": f"0x{presence:08x}",
+            "consecutive_absent_checks": 5,
+        },
+    }
+
+
 def details(data: bytes) -> dict:
     catalog = extract(data)  # Enforces reviewed SHA-256, size and table structure.
     ram = initialized_data(data, catalog["name"])
@@ -160,6 +238,7 @@ def details(data: bytes) -> dict:
         "sha256": catalog["sha256"],
         "initialized_ram_size": len(ram),
         "initialized_ram_sha256": hashlib.sha256(ram).hexdigest(),
+        "system_fault": system_fault_metadata(data, catalog["name"]),
     }
     if catalog["name"] == "US_C_V3.1_Crc.bin":
         result["gauge_fields"] = gauge_fields(data)

@@ -289,12 +289,12 @@ def test_clock_reversal_and_reset_epochs_withhold_persistence(tmp_path):
     assert "suspected_balancing_difficulty" not in codes(result)
 
 
-def test_source_specific_fault_masks_are_not_indicator_aliases(tmp_path):
+def test_source_specific_fault_masks_use_firmware_meanings(tmp_path):
     path = report(tmp_path / "fault.txt", [record(0, mask="0x200")])
     result = analyze_logs(path)
     findings = result.batteries[0].findings
     assert any(f.code == "fault_mask" and "0x200" in f.message for f in findings)
-    assert not any("InternalComm" in f.message for f in findings)
+    assert any("Internal communication/presence fault" in f.message for f in findings)
     # A known indicator bit in an actual snapshot retains its verified meaning.
     path = bundle(tmp_path, run="indicator")
     snap_path = tmp_path / "indicator_snapshot.json"

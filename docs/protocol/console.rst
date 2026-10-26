@@ -399,7 +399,8 @@ fields. Voltages, currents, temperatures, and capacities are divided by 1000; pe
 unscaled. Status labels are normalized to the existing state keys, while original fields,
 protection labels, and event masks remain in ``raw``. A labeled block requires a numeric address
 and recognizable voltage; optional missing fields remain absent. Its event masks are not assumed
-to share the hash-format error-code bit mapping.
+to share the hash-format error-code bit mapping. The :doc:`system-fault chapter
+<faults>` establishes the specific field relationships in the reviewed E2/C images.
 
 Python’s default auto mode acquires local ``getpwr`` first, then discovers modules with ``pwr``.
 Single mode uses the local reading and profile-enabled extensions; parallel mode starts with the

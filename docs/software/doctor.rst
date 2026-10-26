@@ -110,8 +110,18 @@ findings, even when the latest snapshot is normal. Repeated system-error states
 or nonzero historical system-fault masks also require attention. Recorded
 observations and BMS counters are presented separately; neither is an exact count
 of independent physical fault incidents. Historical faults are not labeled as
-currently active. Unknown masks are preserved without guessing their meaning;
-only the verified monitoring-indicator mapping is decoded.
+currently active. Known system-fault bits are decoded using the :doc:`firmware fault-word contracts
+</protocol/faults>`; unknown remainders stay visible. Code meanings are assumed
+stable across firmware revisions. Power/battery event words remain separate.
+For hash-format ``getpwr`` output, US2000C/US3000C use the traced word; other
+profiles retain explicitly labeled vendor-indicator mappings.
+
+For example, ``0x200`` reports an internal communication/presence fault: an
+expected peer was absent in five consecutive presence checks. The condition can
+clear in live state while remaining in historical records. It does not identify
+a specific failed cable or component. State-only ``SysError`` observations say
+that a nonzero detailed code was unavailable, rather than inventing a bit meaning.
+Operational shutdown/reset flags alone are informational, not hardware diagnoses.
 
 SOH is shown as reported by the BMS. Cycle counts prefer statistics when available.
 Doctor does not estimate remaining life, usable capacity, or the meaning of a
@@ -130,9 +140,13 @@ and data limitations. Use JSON for all findings and their source references:
    pylontech-console doctor support/ --imbalance-mv 150
 
 Output files are created exclusively. JSON includes ``schema_version`` and
-``rules_version`` (both initially 1), the selected threshold, per-battery identity,
+``rules_version`` (schema 1, rules 2), the selected threshold, per-battery identity,
 metrics, stable finding codes, severity, certainty, source references, limitations,
-and input/acquisition issues. Source references name the artifact and a record,
+and input/acquisition issues. Fault findings additionally include ``details.faults``
+with the source namespace, raw mask, decoded bits, unknown remainder, mapping
+basis, and historical observation counts where applicable. Historical aliases of
+the same word are counted once per observation and their source fields retained.
+Source references name the artifact and a record,
 line, or module within it. Collection files and generated reports can contain
 private identities and telemetry.
 

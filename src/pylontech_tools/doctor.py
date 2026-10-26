@@ -8,8 +8,9 @@ from datetime import datetime
 from pathlib import Path
 
 from .doctor_inputs import BatteryEvidence, EvidenceReader, Observation
+from .faults import SYSTEM_FIELDS, decode_faults, describe_faults, fault_severity
 from .models import DoctorBattery, DoctorFinding, DoctorReport, ModuleReading
-from .parsers import ERROR_BITS, integer
+from .parsers import integer
 
 FAULT_STATES = {"SysError", "OV", "UV", "Sleep", "COC2", "COC", "DOC2", "DOC", "SC", "OT", "UT"}
 WARNING_STATES = {"High", "Low", "COCAlm", "DOCAlm"}
@@ -151,7 +152,7 @@ def _mask_value(value: str) -> int | None:
         return None
 
 
-def _alarms(obs: Observation) -> list[tuple[str, str, str]]:
+def _alarms(obs: Observation, model: str | None = None) -> list[tuple[str, str, str]]:
     alarms = []
     entries = [("module", obs.module.states)] + [
         (f"cell {c.index}", c.states) for c in obs.module.cells
@@ -168,19 +169,29 @@ def _alarms(obs: Observation) -> list[tuple[str, str, str]]:
                         else "info"
                     )
                     alarms.append((f"{source}.{field}: {token}", severity, "bms_state"))
-    code = obs.module.error_code
-    if code:
-        for bit in range(code.bit_length()):
-            if code & (1 << bit):
-                name = ERROR_BITS[bit] if bit < len(ERROR_BITS) else f"unknown indicator bit {bit}"
-                alarms.append(
-                    (name, "error" if bit < len(ERROR_BITS) else "warning", "indicator_fault")
-                )
-    for field, raw in obs.masks.items():
-        if _mask_value(raw):
-            severity = "warning" if field in {"System Fault", "SysErrCode"} else "info"
-            alarms.append((f"{field}: {raw} (source-specific mask)", severity, "fault_mask"))
+    for decoded in _decoded_faults(obs, model):
+        if int(decoded["raw_mask"], 16):
+            code = "indicator_fault" if decoded["source"] == "getpwr" else "fault_mask"
+            severity = fault_severity(decoded)
+            if (
+                code == "indicator_fault"
+                and severity == "warning"
+                and not int(decoded["unknown_mask"], 16)
+            ):
+                severity = "error"
+            alarms.append((describe_faults(decoded), severity, code))
     return alarms
+
+
+def _decoded_faults(obs: Observation, model: str | None = None) -> list[dict]:
+    values = []
+    if obs.module.error_code is not None and obs.module.error_code >= 0:
+        values.append(decode_faults(obs.module.error_code, "getpwr", model=model))
+    for source, raw in obs.masks.items():
+        value = _mask_value(raw)
+        if value is not None and value >= 0:
+            values.append(decode_faults(value, source, model=model))
+    return values
 
 
 def _statistics(bucket: BatteryEvidence) -> tuple[dict[str, str], str | None]:
@@ -201,6 +212,7 @@ def _statistics(bucket: BatteryEvidence) -> tuple[dict[str, str], str | None]:
 
 def analyze_battery(bucket: BatteryEvidence, threshold: int) -> DoctorBattery:
     observations = _deduplicate(bucket)
+    model = bucket.identity.name if bucket.identity else None
     clocks = sorted((c for c in bucket.clocks if c[2]), key=lambda c: datetime.fromisoformat(c[2]))
     bad_clock = _clock_issues(observations) or any(b[0] < a[0] for a, b in zip(clocks, clocks[1:]))
     if bucket.reset_seen:
@@ -280,11 +292,21 @@ def analyze_battery(bucket: BatteryEvidence, threshold: int) -> DoctorBattery:
                     [latest.source],
                 )
             )
-        for message, severity, code in _alarms(latest):
+        for message, severity, code in _alarms(latest, model):
             prefix = "Latest snapshot" if latest.live else "Latest historical record"
-            findings.append(DoctorFinding(code, severity, f"{prefix}: {message}", [latest.source]))
+            findings.append(
+                DoctorFinding(
+                    code,
+                    severity,
+                    f"{prefix}: {message}",
+                    [latest.source],
+                    details={"faults": _decoded_faults(latest, model)}
+                    if code in {"fault_mask", "indicator_fault"}
+                    else {},
+                )
+            )
     historical = Counter(
-        message for o in observations if not o.live for message, _, _ in _alarms(o)
+        message for o in observations if not o.live for message, _, _ in _alarms(o, model)
     )
     if historical:
         findings.append(
@@ -295,7 +317,7 @@ def analyze_battery(bucket: BatteryEvidence, threshold: int) -> DoctorBattery:
                     f"{name}: {count} recorded occurrence(s)"
                     for name, count in sorted(historical.items())
                 ),
-                [o.source for o in observations if not o.live and _alarms(o)],
+                [o.source for o in observations if not o.live and _alarms(o, model)],
             )
         )
     recorded = [o for o in observations if not o.live and o.complete]
@@ -353,18 +375,60 @@ def analyze_battery(bucket: BatteryEvidence, threshold: int) -> DoctorBattery:
         if not o.live
         and (
             o.module.states.get("Base.St") == "SysError"
-            or any(
-                _mask_value(v) for k, v in o.masks.items() if k in {"System Fault", "SysErrCode"}
-            )
+            or any(_mask_value(v) for k, v in o.masks.items() if k in SYSTEM_FIELDS)
         )
     ]
     if system_faults:
+        counts = Counter()
+        sources = defaultdict(set)
+        for obs in system_faults:
+            observed = defaultdict(set)
+            for source, raw in obs.masks.items():
+                value = _mask_value(raw)
+                if source in SYSTEM_FIELDS and value is not None and value >= 0:
+                    observed[value].add(source)
+            for value, fields in observed.items():
+                counts[value] += 1
+                sources[value].update(fields)
+        decoded_masks = []
+        for value, count in sorted(counts.items()):
+            decoded = decode_faults(value, "System Fault", model=model)
+            decoded["source_fields"] = sorted(sources[value])
+            decoded["observations"] = count
+            decoded_masks.append(decoded)
+        state_only = sum(
+            obs.module.states.get("Base.St") == "SysError"
+            and not any(
+                _mask_value(raw) for field, raw in obs.masks.items() if field in SYSTEM_FIELDS
+            )
+            for obs in system_faults
+        )
+        explanations = list(
+            dict.fromkeys(
+                bit["explanation"]
+                for decoded in decoded_masks
+                for bit in decoded["decoded_bits"]
+                if bit["explanation"] and bit["code"] == "internal_communication"
+            )
+        )
+        needs_attention = any(
+            obs.module.states.get("Base.St") == "SysError" for obs in system_faults
+        ) or any(fault_severity(d) == "warning" for d in decoded_masks)
+        label = "System error/fault" if needs_attention else "System operational flags"
+        message = f"{label} recorded in {len(system_faults)} observation(s)."
+        if decoded_masks:
+            message += " " + "; ".join(describe_faults(d) for d in decoded_masks) + "."
+        if state_only:
+            message += f" {state_only} SysError observation(s) have no nonzero detailed fault code; investigate using the original record and communication diagnostics."
+        if explanations:
+            message += " " + " ".join(explanations)
         findings.append(
             DoctorFinding(
                 "historical_system_fault",
-                "warning",
-                f"System error/fault recorded in {len(system_faults)} observation(s); investigate further. Unknown fault bits are not assigned a hardware diagnosis.",
+                "warning" if needs_attention else "info",
+                message,
                 [o.source for o in system_faults],
+                details={"faults": decoded_masks, "state_only_observations": state_only},
             )
         )
     # Repeated near-full readings are evidence of difficulty, not a hardware diagnosis.
