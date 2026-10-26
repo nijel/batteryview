@@ -34,6 +34,7 @@ include = [
     "/docs/firmware-details.json",
     "/scripts/extract_firmware_commands.py",
     "/scripts/extract_firmware_details.py",
+    "/scripts/check_release.py",
     "/.github/workflows/*.yml",
     "/README.md",
     "/LICENSE",
@@ -55,6 +56,7 @@ select = ["E4", "E7", "E9", "F", "I"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.11"]
+release = ["hatchling>=1.27", "packaging>=24", "twine>=6"]
 docs = [
     "furo==2025.12.19",
     "sphinx==9.2.0",
