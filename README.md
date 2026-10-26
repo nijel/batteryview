@@ -7,10 +7,11 @@ monitor battery modules using JSON, JSON Lines, or CSV.
 The distribution is `pylontech-tools`, the Python package is `pylontech_tools`,
 and the CLI is `pylontech-console`.
 
-Requires Python 3.11 or newer. From a source checkout:
+Requires Python 3.11 or newer. Install from
+[PyPI](https://pypi.org/project/pylontech-tools/), preferably inside a virtual environment:
 
 ```sh
-python -m pip install .
+python -m pip install pylontech-tools
 pylontech-console ports
 pylontech-console info --port /dev/ttyUSB0
 pylontech-console collect --port /dev/ttyUSB0 --output support/

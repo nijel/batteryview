@@ -15,15 +15,43 @@ Pylontech have not yet been verified.** Other firmware variants need additional 
 Install
 -------
 
-Requires Python 3.11 or newer on Windows, Linux, or macOS. Clone the
-`source repository <https://github.com/nijel/pylontech-tools>`__ before installing:
+Requires Python 3.11 or newer on Windows, Linux, or macOS. Install the released
+package from `PyPI <https://pypi.org/project/pylontech-tools/>`__. Use an existing
+virtual environment, or create one:
 
 .. code:: sh
 
-   git clone https://github.com/nijel/pylontech-tools.git
-   cd pylontech-tools
-   python -m pip install .
+   python -m venv .venv
+
+Activate it on Linux or macOS:
+
+.. code-block:: sh
+
+   . .venv/bin/activate
+
+Or in Windows PowerShell:
+
+.. code-block:: powershell
+
+   .venv\Scripts\Activate.ps1
+
+Install the package and check the command-line entry point:
+
+.. code-block:: sh
+
+   python -m pip install pylontech-tools
    pylontech-console ports
+
+To upgrade an existing installation, activate the same environment and run:
+
+.. code-block:: sh
+
+   python -m pip install --upgrade pylontech-tools
+
+For a source checkout and contributor setup, see :doc:`development`.
+
+Connect to the battery
+----------------------
 
 Use the battery’s console connection and the appropriate serial cable. The default connection
 sequence sends BatteryView’s mode-switch frame at 1200 baud, then opens the console at 115200

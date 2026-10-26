@@ -6,8 +6,14 @@ Development and validation
 Development and validation
 --------------------------
 
+For normal use, :doc:`install the released package from PyPI <installation>`.
+To work on the code, clone the source repository and install the locked
+development dependencies:
+
 .. code:: sh
 
+   git clone https://github.com/nijel/pylontech-tools.git
+   cd pylontech-tools
    uv sync --frozen
    uv run --frozen python -m pytest -q
    uv run --frozen python -m ruff check .
