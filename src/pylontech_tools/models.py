@@ -118,3 +118,47 @@ class ConsoleReadResult:
     command: str
     text: str
     fields: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DoctorFinding:
+    """A screening finding supported by named input observations."""
+
+    code: str
+    severity: str
+    message: str
+    evidence: list[str] = field(default_factory=list)
+    certainty: str = "observed"
+
+
+@dataclass(frozen=True)
+class DoctorBattery:
+    """Health screening of one identified battery or isolated unidentified input."""
+
+    key: str
+    identity: dict[str, Any]
+    status: str
+    metrics: dict[str, Any]
+    findings: list[DoctorFinding]
+    limitations: list[str]
+
+
+@dataclass(frozen=True)
+class DoctorReport:
+    """Versioned doctor output; findings do not certify physical battery health."""
+
+    status: str
+    batteries: list[DoctorBattery]
+    input_issues: list[dict[str, str]] = field(default_factory=list)
+    imbalance_mv: int = 100
+    schema_version: int = 1
+    rules_version: int = 1
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @property
+    def exit_code(self) -> int:
+        if self.status == "unusable":
+            return 2
+        return 0 if self.status == "no_issues_detected" else 1

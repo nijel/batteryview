@@ -25,6 +25,7 @@ from .models import (
     CollectionResult,
     ConsoleReadResult,
     DeviceInfo,
+    DoctorReport,
     ModuleReading,
     ReportResult,
     Snapshot,
@@ -163,6 +164,18 @@ class BatteryClient:
     def configuration(self) -> ConsoleReadResult:
         """Display the complete configuration without supplying setter operands."""
         return self._diagnostic_read(f"config {self.module}" if self.module else "config")
+
+    def doctor(
+        self, *, save_inputs: str | Path | None = None, imbalance_mv: int = 100
+    ) -> DoctorReport:
+        """Screen the connected battery using read-only live and historical evidence.
+
+        Optionally retain inputs for offline analysis; no state-changing diagnostic
+        tests or maintenance operations are run. Requires a direct connection.
+        """
+        from .doctor_acquisition import acquire_doctor
+
+        return acquire_doctor(self, save_inputs=save_inputs, imbalance_mv=imbalance_mv)
 
     def collect(self, output: str | Path, *, progress: Progress | None = None) -> CollectionResult:
         """Collect the directly connected module, stopping at the first failure.

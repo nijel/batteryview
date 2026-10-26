@@ -14,12 +14,16 @@ python -m pip install .
 pylontech-console ports
 pylontech-console info --port /dev/ttyUSB0
 pylontech-console collect --port /dev/ttyUSB0 --output support/
+pylontech-console doctor support/
 ```
 
 Use the battery console connection and an appropriate serial cable. See the
 [installation guide](https://pylontech-tools.readthedocs.io/en/latest/software/installation.html) for connection options.
 
 ## Documentation
+
+Use [battery doctor](https://pylontech-tools.readthedocs.io/en/latest/software/doctor.html)
+for read-only health screening online or from saved logs.
 
 Browse the [online documentation](https://pylontech-tools.readthedocs.io/en/latest/).
 

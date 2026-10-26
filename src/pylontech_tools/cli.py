@@ -11,6 +11,7 @@ from typing import TextIO
 
 from . import BatteryClient, CommandCancelled, PylontechError, Snapshot
 from .diagnostics import configure_logging, failure_diagnostic
+from .doctor import analyze_logs, format_doctor
 from .profiles import PROFILES
 from .transport import list_ports
 
@@ -84,6 +85,29 @@ def parser() -> argparse.ArgumentParser:
     sub = root.add_subparsers(dest="command", required=True)
     ports = sub.add_parser("ports", help="list available serial ports", parents=[diagnostics])
     ports.add_argument("--format", choices=["json", "csv"], default="json")
+    doctor = sub.add_parser(
+        "doctor", help="screen battery health online or from saved logs", parents=[diagnostics]
+    )
+    doctor.add_argument(
+        "source", nargs="?", type=Path, help="offline report, manifest, or collection directory"
+    )
+    doctor.add_argument("--port", help="serial port for online doctor (exclusive with source)")
+    doctor.add_argument("--format", choices=["text", "json"], default="text")
+    doctor.add_argument("--output", type=Path, help="new report file (default: stdout)")
+    doctor.add_argument(
+        "--imbalance-mv",
+        type=_count,
+        default=100,
+        help="cell-spread screening threshold (default: 100 mV)",
+    )
+    doctor.add_argument(
+        "--save-inputs", type=Path, help="save online evidence for offline analysis"
+    )
+    doctor.add_argument("--baud", type=_count, default=argparse.SUPPRESS)
+    doctor.add_argument("--timeout", type=_positive, default=argparse.SUPPRESS)
+    doctor.add_argument("--no-shift", action="store_true", default=argparse.SUPPRESS)
+    doctor.add_argument("--read-retries", type=int, choices=range(3), default=argparse.SUPPRESS)
+    doctor.add_argument("--profile", choices=sorted(PROFILES), default=argparse.SUPPRESS)
     for name, help_text in [
         ("info", "read device identity"),
         ("stat", "read counters, record counts, and state of health"),
@@ -192,7 +216,17 @@ def _write_snapshot(snapshot: Snapshot, output: TextIO, csv_writer: csv.DictWrit
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parser().parse_args(argv)
+    root = parser()
+    args = root.parse_args(argv)
+    if args.command == "doctor":
+        if bool(args.source) == bool(args.port):
+            root.error("doctor requires exactly one input path or --port")
+        if args.source and any(
+            hasattr(args, key) for key in ("baud", "timeout", "no_shift", "read_retries", "profile")
+        ):
+            root.error("doctor connection options require --port")
+        if args.source and args.save_inputs:
+            root.error("--save-inputs requires online doctor")
     try:
         with configure_logging(
             debug=getattr(args, "debug", False),
@@ -202,11 +236,13 @@ def main(argv: list[str] | None = None) -> int:
             return _run(args)
     except OSError as exc:
         print(f"pylontech-console: Cannot configure diagnostic logging: {exc}", file=sys.stderr)
-        return 1
+        return 2 if args.command == "doctor" else 1
 
 
 def _run(args: argparse.Namespace) -> int:
     try:
+        if args.command == "doctor":
+            return _run_doctor(args)
         if args.command == "ports":
             ports = list_ports()
             if args.format == "json":
@@ -289,7 +325,12 @@ def _run(args: argparse.Namespace) -> int:
         return 0
     except (KeyboardInterrupt, CommandCancelled) as exc:
         logger.debug("Operation interrupted")
-        print("Interrupted; any partial report has been retained.", file=sys.stderr)
+        print(
+            "Doctor interrupted; saved inputs, if requested, have been retained."
+            if args.command == "doctor"
+            else "Interrupted; any partial report has been retained.",
+            file=sys.stderr,
+        )
         detail = failure_diagnostic(exc)
         if detail:
             print(detail, file=sys.stderr)
@@ -300,7 +341,35 @@ def _run(args: argparse.Namespace) -> int:
         detail = failure_diagnostic(exc)
         if detail:
             print(detail, file=sys.stderr)
-        return 1
+        return 2 if args.command == "doctor" else 1
+
+
+def _run_doctor(args: argparse.Namespace) -> int:
+    # Analyze offline before creating a file that might lie inside the input directory.
+    report = analyze_logs(args.source, imbalance_mv=args.imbalance_mv) if args.source else None
+    output = args.output.open("x", encoding="utf-8", newline="") if args.output else sys.stdout
+    try:
+        if not args.source:
+            with BatteryClient(
+                args.port,
+                baudrate=getattr(args, "baud", 115200),
+                timeout=getattr(args, "timeout", 5),
+                shift=not getattr(args, "no_shift", False),
+                read_retries=getattr(args, "read_retries", 0),
+                profile=getattr(args, "profile", None),
+                monitoring_mode="single",
+            ) as client:
+                report = client.doctor(save_inputs=args.save_inputs, imbalance_mv=args.imbalance_mv)
+        output.write(
+            json.dumps(report.to_dict(), ensure_ascii=False) + "\n"
+            if args.format == "json"
+            else format_doctor(report)
+        )
+        output.flush()
+        return report.exit_code
+    finally:
+        if output is not sys.stdout:
+            output.close()
 
 
 if __name__ == "__main__":

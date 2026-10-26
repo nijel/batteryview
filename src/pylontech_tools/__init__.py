@@ -3,6 +3,7 @@
 import logging
 
 from .client import BatteryClient
+from .doctor import analyze_logs
 from .errors import (
     CommandCancelled,
     CommandTimeout,
@@ -20,6 +21,9 @@ from .models import (
     CollectionResult,
     ConsoleReadResult,
     DeviceInfo,
+    DoctorBattery,
+    DoctorFinding,
+    DoctorReport,
     ModuleReading,
     ReportResult,
     Snapshot,
@@ -30,6 +34,10 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     "Alarm",
+    "analyze_logs",
+    "DoctorBattery",
+    "DoctorFinding",
+    "DoctorReport",
     "BatteryClient",
     "PylontechError",
     "CellReading",

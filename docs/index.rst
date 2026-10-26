@@ -25,7 +25,8 @@ connected battery's identity:
 
 Replace ``/dev/ttyUSB0`` with your serial port, such as ``COM3`` on Windows.
 For a support request, :doc:`collect a support bundle <software/collection>`;
-for integration into your own application, start with
+:doc:`screen battery health <software/doctor>` online or from saved logs.
+For integration into your own application, start with
 :doc:`the Python client examples <software/python>`.
 
 Explore the protocol

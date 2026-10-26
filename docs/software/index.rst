@@ -13,4 +13,5 @@ Python library and CLI
    cli
    api
    diagnostics
+   doctor
    development

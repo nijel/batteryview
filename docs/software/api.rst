@@ -79,3 +79,17 @@ names; absent measurements are ``None``. Results retain raw console data.
 
 .. autoclass:: pylontech_tools.DeviceNotPresentError
    :members:
+
+.. autofunction:: pylontech_tools.analyze_logs
+
+.. autoclass:: pylontech_tools.DoctorReport
+   :members:
+   :undoc-members:
+
+.. autoclass:: pylontech_tools.DoctorBattery
+   :members:
+   :undoc-members:
+
+.. autoclass:: pylontech_tools.DoctorFinding
+   :members:
+   :undoc-members:

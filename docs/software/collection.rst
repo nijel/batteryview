@@ -44,3 +44,8 @@ Existing ``--debug``, ``--trace-serial``, and ``--log-file`` options also work w
 raw serial tracing remains opt-in. Collection files contain private device information and
 telemetry. The example ``support/`` directory is ignored by Git, and package source allowlists
 exclude generated collections.
+
+Analyze the gathered files with :doc:`doctor` to combine each battery's evidence
+and summarize voltage imbalance, recorded alarms, and possible balancing
+difficulty. Doctor matches identities across repeated collections without
+changing these files.
