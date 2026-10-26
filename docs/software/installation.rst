@@ -15,9 +15,52 @@ Pylontech have not yet been verified.** Other firmware variants need additional 
 Install
 -------
 
-Requires Python 3.11 or newer on Windows, Linux, or macOS. Install the released
-package from `PyPI <https://pypi.org/project/pylontech-tools/>`__. Use an existing
-virtual environment, or create one:
+Requires Python 3.11 or newer on Windows, Linux, or macOS. For the command-line
+application, use `uv <https://docs.astral.sh/uv/getting-started/installation/>`__
+to run the released package from `PyPI <https://pypi.org/project/pylontech-tools/>`__.
+uv manages an isolated tool environment, so you do not need to create or activate
+a virtual environment yourself.
+
+Run without a permanent installation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With uv installed, use ``uvx`` to run a command directly:
+
+.. code-block:: sh
+
+   uvx --from pylontech-tools pylontech-console ports
+   uvx --from pylontech-tools pylontech-console info --port /dev/ttyUSB0
+
+``--from pylontech-tools`` selects the distribution because its name differs
+from the executable, ``pylontech-console``. uv downloads dependencies as needed
+and reuses its cached tool environment on later runs. Replace ``/dev/ttyUSB0``
+with your console port, such as ``COM3`` on Windows.
+
+Install for regular use
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+To make ``pylontech-console`` available directly in your shell:
+
+.. code-block:: sh
+
+   uv tool install pylontech-tools
+   pylontech-console ports
+
+If uv reports that its executable directory is not on ``PATH``, run
+``uv tool update-shell`` and restart your shell. To upgrade the installed tool:
+
+.. code-block:: sh
+
+   uv tool upgrade pylontech-tools
+
+See uv's `tool guide <https://docs.astral.sh/uv/guides/tools/>`__ for details.
+
+Install in a Python environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For library use in your own Python application, or if you prefer pip, install
+the package in your application's environment. Use an existing virtual
+environment, or create one:
 
 .. code:: sh
 

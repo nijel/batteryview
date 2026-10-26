@@ -7,13 +7,19 @@ monitor battery modules using JSON, JSON Lines, or CSV.
 The distribution is `pylontech-tools`, the Python package is `pylontech_tools`,
 and the CLI is `pylontech-console`.
 
-Requires Python 3.11 or newer. Install from
-[PyPI](https://pypi.org/project/pylontech-tools/), preferably inside a virtual environment:
+Requires Python 3.11 or newer. With
+[uv installed](https://docs.astral.sh/uv/getting-started/installation/), run the
+CLI directly from [PyPI](https://pypi.org/project/pylontech-tools/):
 
 ```sh
-python -m pip install pylontech-tools
-pylontech-console ports
-pylontech-console info --port /dev/ttyUSB0
+uvx --from pylontech-tools pylontech-console ports
+uvx --from pylontech-tools pylontech-console info --port /dev/ttyUSB0
+```
+
+For regular use, install the CLI into a dedicated environment managed by uv:
+
+```sh
+uv tool install pylontech-tools
 pylontech-console collect --port /dev/ttyUSB0 --output support/
 pylontech-console doctor support/
 ```

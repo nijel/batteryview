@@ -14,15 +14,14 @@ Get started
 -----------
 
 You need an appropriate serial connection to the battery's console port. Follow
-:doc:`the installation guide <software/installation>` to install the tools and
-configure your connection. Install from PyPI in your Python environment, then
-list the available ports and read the connected battery's identity:
+:doc:`the installation guide <software/installation>` to set up uv and configure
+your connection. Run the CLI directly from PyPI with ``uvx`` to list the
+available ports and read the connected battery's identity:
 
 .. code-block:: sh
 
-   python -m pip install pylontech-tools
-   pylontech-console ports
-   pylontech-console info --port /dev/ttyUSB0
+   uvx --from pylontech-tools pylontech-console ports
+   uvx --from pylontech-tools pylontech-console info --port /dev/ttyUSB0
 
 Replace ``/dev/ttyUSB0`` with your serial port, such as ``COM3`` on Windows.
 For a support request, :doc:`collect a support bundle <software/collection>`;

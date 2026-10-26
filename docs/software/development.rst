@@ -6,7 +6,7 @@ Development and validation
 Development and validation
 --------------------------
 
-For normal use, :doc:`install the released package from PyPI <installation>`.
+For normal use, :doc:`run the released CLI with uvx or install it with uv <installation>`.
 To work on the code, clone the source repository and install the locked
 development dependencies:
 
