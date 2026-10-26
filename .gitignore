@@ -220,7 +220,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 /BatteryView_*
-/Logs
+/Logs/
+/Pylontech/
 /support/
 
 # Editor recovery files can contain private data.
