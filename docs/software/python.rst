@@ -53,8 +53,8 @@ Read-only diagnostics
        print(statistics.fields)
        print(clock.text, diagnostic_log.text, configuration.text)
 
-Each method returns :class:`~pylontech_tools.ConsoleReadResult` with the command,
-complete response text, and labeled fields stored as strings. Unstructured
+Each method returns a typed subclass of :class:`~pylontech_tools.ConsoleReadResult`
+with the command, complete response text, and labeled fields stored as strings. Unstructured
 responses are retained without guessing their structure or units. Optionally
 pass ``count=1`` through ``count=32`` to ``diagnostic_log``. Clock and diagnostic
 log reads reject addressed module selection; statistics and configuration honor
@@ -63,3 +63,6 @@ log reads reject addressed module selection; statistics and configuration honor
 :class:`~pylontech_tools.DeviceBusyError` and
 :class:`~pylontech_tools.DeviceNotPresentError` derive from ``ProtocolError`` and
 retain the response and exchange context. They are not automatically retried.
+
+See :doc:`reads` for the complete individual read API, typed results, parameters,
+and firmware-specific restrictions.

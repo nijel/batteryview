@@ -315,7 +315,11 @@ def _run(args: argparse.Namespace) -> int:
                     output.write(
                         result.text
                         if args.format == "text"
-                        else json.dumps(asdict(result), ensure_ascii=False) + "\n"
+                        else json.dumps(
+                            result.to_console_dict(),
+                            ensure_ascii=False,
+                        )
+                        + "\n"
                     )
                     output.flush()
                 elif args.command == "info":

@@ -9,20 +9,20 @@ from .models import DiagnosticReadResult, DiagnosticsReport
 if TYPE_CHECKING:
     from .client import BatteryClient
 
-COMMANDS = (
-    "stat",
-    "time",
-    "log",
-    "config",
-    "totalcoul",
-    "tcycle",
-    "emptyvolt",
-    "setlowcfg",
-    "ctrl",
-    "prot",
-    "euro",
-    "trdagevolt",
-    "soh",
+READS = (
+    ("stat", "statistics"),
+    ("time", "read_clock"),
+    ("log", "diagnostic_log"),
+    ("config", "configuration"),
+    ("totalcoul", "nominal_capacity"),
+    ("tcycle", "cycle_statistics"),
+    ("emptyvolt", "empty_voltage"),
+    ("setlowcfg", "low_soc_configuration"),
+    ("ctrl", "control_status"),
+    ("prot", "protection_status"),
+    ("euro", "lifetime_statistics"),
+    ("trdagevolt", "aging_voltage_history"),
+    ("soh", "soh_diagnostics"),
 )
 
 
@@ -33,9 +33,9 @@ def read_diagnostics(client: "BatteryClient") -> DiagnosticsReport:
         client.last_failure = None
         timestamp = datetime.now(timezone.utc).isoformat()
         reads = []
-        for command in COMMANDS:
+        for command, method in READS:
             try:
-                result = client._diagnostic_read(command)
+                result = getattr(client, method)()
             except (KeyboardInterrupt, CommandCancelled):
                 raise
             except (PylontechError, OSError, ValueError) as exc:

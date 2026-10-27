@@ -42,9 +42,13 @@ def test_diagnostic_commands_preserve_response_and_fields(replay, method, args, 
     text = response(command)
     session, transport = replay([(command.encode() + b"\n", text)], chunk_size=1)
     result = getattr(BatteryClient(session=session, module=module), method)(*args)
-    assert result == ConsoleReadResult(
-        command, text, {"Future field": "synthetic", "Counter": "12"}
-    )
+    assert isinstance(result, ConsoleReadResult)
+    assert result.to_console_dict() == {
+        "command": command,
+        "text": text,
+        "fields": {"Future field": "synthetic", "Counter": "12"},
+    }
+    assert result.values["Counter"] == 12
     with pytest.raises(FrozenInstanceError):
         result.command = "save"
     assert not transport.exchanges
@@ -56,8 +60,13 @@ def test_unstructured_clock_and_empty_log_remain_raw(replay):
     log = response("log", "")
     session, _ = replay([(b"time\n", clock), (b"log\n", log)])
     client = BatteryClient(session=session)
-    assert client.read_clock() == ConsoleReadResult("time", clock, {})
-    assert client.diagnostic_log() == ConsoleReadResult("log", log, {})
+    clock_result = client.read_clock()
+    assert clock_result.to_console_dict() == ConsoleReadResult("time", clock, {}).to_console_dict()
+    assert clock_result.timestamp.year == 2000
+    assert (
+        client.diagnostic_log().to_console_dict()
+        == ConsoleReadResult("log", log, {}).to_console_dict()
+    )
 
 
 @pytest.mark.parametrize("count", [True, False, 0, 33, -1, 1.0, "2"])

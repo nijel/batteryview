@@ -44,6 +44,8 @@ from .parsers import (
 )
 from .profiles import monitoring_profile
 from .protocol import ConsoleSession, Response
+from .read_models import ClockResult, ParsedReadResult, StatisticsResult
+from .reads import ReadOnlyCommands
 from .transcript import TranscriptWriter, report_filename
 from .transport import SerialTransport
 
@@ -51,7 +53,7 @@ Progress = Callable[[str, int, int], None]
 logger = logging.getLogger(__name__)
 
 
-class BatteryClient:
+class BatteryClient(ReadOnlyCommands):
     def __init__(
         self,
         port: str | None = None,
@@ -143,16 +145,16 @@ class BatteryClient:
             }
             return ConsoleReadResult(command, response.text, fields)
 
-    def statistics(self) -> ConsoleReadResult:
+    def statistics(self) -> StatisticsResult:
         """Read counters, record counts, SOH, and SOC without clearing them."""
-        return self._diagnostic_read(f"stat {self.module}" if self.module else "stat")
+        return self._passive("stat", StatisticsResult, addressed=True)
 
-    def read_clock(self) -> ConsoleReadResult:
+    def read_clock(self) -> ClockResult:
         """Read the directly connected battery's RTC without setting it."""
         self._direct_only("Clock read")
-        return self._diagnostic_read("time")
+        return self._passive("time", ClockResult)
 
-    def diagnostic_log(self, count: int | None = None) -> ConsoleReadResult:
+    def diagnostic_log(self, count: int | None = None) -> ParsedReadResult:
         """Read the local diagnostic ring, newest first; count must be 1–32.
 
         Omit count to let the firmware select the available entries. The response
@@ -161,11 +163,7 @@ class BatteryClient:
         self._direct_only("Diagnostic log")
         if count is not None and (type(count) is not int or not 1 <= count <= 32):
             raise ValueError("Log count must be an integer between 1 and 32")
-        return self._diagnostic_read("log" if count is None else f"log {count}")
-
-    def configuration(self) -> ConsoleReadResult:
-        """Display the complete configuration without supplying setter operands."""
-        return self._diagnostic_read(f"config {self.module}" if self.module else "config")
+        return self._passive("log" if count is None else f"log {count}", ParsedReadResult)
 
     def diagnostics(self) -> DiagnosticsReport:
         """Gather local read-only diagnostics, skipping unsupported commands.
@@ -235,22 +233,26 @@ class BatteryClient:
                         "Read recovery did not confirm debug prompt", response=sync.text
                     )
             else:
-                self._last_context = response.context or {
-                    "command": command_label(command),
-                    "boundary": response.boundary,
-                }
                 if writer is not None:
                     writer.append(response.text)
-                if command.split()[0] in {"data", "datalist"} and re.search(
-                    r"(?:^|[\r\n])[ \t]*Error![ \t]*(?=[\r\n]|$)", response.text
-                ):
-                    raise ProtocolError(
-                        "Firmware reported a corrupt record; report incomplete",
-                        response=response.text,
-                        context=self._last_context,
-                    )
-                return response
+                return self._accept_read(response, command)
         raise AssertionError("unreachable")
+
+    def _accept_read(self, response: Response, command: str) -> Response:
+        """Share context and corrupt-record handling with paginated reads."""
+        self._last_context = response.context or {
+            "command": command_label(command),
+            "boundary": response.boundary,
+        }
+        if command.split()[0] in {"data", "datalist"} and re.search(
+            r"(?:^|[\r\n])[ \t]*Error![ \t]*(?=[\r\n]|$)", response.text
+        ):
+            raise ProtocolError(
+                "Firmware reported a corrupt record; report incomplete",
+                response=response.text,
+                context=self._last_context,
+            )
+        return response
 
     def _direct_only(self, operation: str) -> None:
         if self.module is not None:

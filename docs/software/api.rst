@@ -11,6 +11,7 @@ names; absent measurements are ``None``. Results retain raw console data.
 
 .. autoclass:: pylontech_tools.BatteryClient
    :members:
+   :inherited-members:
    :undoc-members:
 
 .. autoclass:: pylontech_tools.PylontechError
@@ -101,3 +102,62 @@ names; absent measurements are ``None``. Results retain raw console data.
 .. autoclass:: pylontech_tools.DoctorFinding
    :members:
    :undoc-members:
+
+Individual read result types
+----------------------------
+
+.. autoclass:: pylontech_tools.ParsedReadResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.Quantity
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.CommunicationResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.MeasurementResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.StatisticsResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.ClockResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.ConfigurationResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.CapacityResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.AccountingResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.StorageResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.RegisterResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.Record
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.RecordsResult
+   :members:
+   :inherited-members:
+
+.. autoclass:: pylontech_tools.CheckResult
+   :members:
+   :inherited-members:

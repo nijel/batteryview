@@ -92,7 +92,12 @@ def _acquire(client: BatteryClient, directory: Path, threshold: int) -> DoctorRe
                         "diagnostic_log": client.diagnostic_log,
                     }[name]
                     result = method()
-                    _write_json(artifact, asdict(result))
+                    _write_json(
+                        artifact,
+                        result.to_console_dict()
+                        if name in {"statistics", "clock", "configuration", "diagnostic_log"}
+                        else asdict(result),
+                    )
                     if name == "identity":
                         manifest["device"] = asdict(result)
                 step.update(status="complete", artifact=artifact.name)

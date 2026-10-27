@@ -10,6 +10,7 @@ Python library and CLI
    reset-soc
    monitoring
    python
+   reads
    cli
    api
    diagnostics

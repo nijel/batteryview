@@ -119,6 +119,10 @@ class ConsoleReadResult:
     text: str
     fields: dict[str, str] = field(default_factory=dict)
 
+    def to_console_dict(self) -> dict[str, object]:
+        """Return the stable raw-evidence JSON schema used by CLI and doctor."""
+        return {"command": self.command, "text": self.text, "fields": self.fields}
+
 
 @dataclass(frozen=True)
 class DiagnosticReadResult:

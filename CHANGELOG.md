@@ -7,6 +7,10 @@ grouped below; dated version sections provide the GitHub release notes.
 
 ### Added
 
+- Expose verified read-only protocol commands as individual Python methods with
+  typed results for measurements, settings, accounting, records, storage, registers,
+  and passive checks. Preserve raw evidence and existing CLI/doctor JSON schemas.
+
 - Gather capacity bookkeeping, control/protection status, usage metrics, voltage
   extrema, and existing diagnostic reads with one read-only `diagnostics` command.
   Unsupported commands, including unavailable `soh`, are skipped; text and JSON
