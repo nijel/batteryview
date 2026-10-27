@@ -97,31 +97,52 @@ password. See PyPI's `trusted publishing guide
 Create a release
 ~~~~~~~~~~~~~~~~
 
+Record user-visible changes under ``Unreleased`` in the repository's
+`CHANGELOG.md <https://github.com/nijel/pylontech-tools/blob/main/CHANGELOG.md>`__.
+Use concise entries under the applicable Added, Changed, Fixed, Removed, or
+Security headings. Significant documentation and development changes belong
+there too; routine internal cleanup does not require an entry.
+
+Before releasing, move the relevant entries into a section named
+``## [VERSION] - YYYY-MM-DD``, using the exact project version and release date.
+Retain an empty ``## [Unreleased]`` section for subsequent changes. Use inline
+Markdown links so that the extracted notes remain self-contained.
+
 Update the static project version and lockfile, commit the changes, then tag that
-commit. For example, after setting the version to ``0.1.0``:
+commit. For example, after preparing a dated ``[0.2.0]`` changelog section and
+setting the project version to ``0.2.0``:
 
 .. code-block:: sh
 
    uv lock
    uv sync --locked --group release
-   uv run --locked --group release python scripts/check_release.py v0.1.0
+   uv run --locked --group release python scripts/check_release.py v0.2.0 --notes-output release-notes.md
    uv build --no-build-isolation --no-create-gitignore
-   uv run --locked --group release python scripts/check_release.py v0.1.0 --dist dist
+   uv run --locked --group release python scripts/check_release.py v0.2.0 --dist dist
    uv run --locked --group release twine check --strict dist/*
-   git tag -a v0.1.0 -m "Release 0.1.0"
-   git push origin v0.1.0
+   git tag -a v0.2.0 -m "Release 0.2.0"
+   git push origin v0.2.0
 
 Use a clean ``dist/`` directory for these local checks. Do not commit build
-artifacts. The release workflow creates them independently from the tagged commit.
+artifacts or the extracted ``release-notes.md``. The release workflow creates
+them independently from the tagged commit, with notes outside ``dist/``.
+Validation requires exactly one matching, dated changelog section with
+substantive notes, and fails before building or publishing if it is missing,
+duplicated, empty, or has an invalid date.
 Local version identifiers such as ``0.1.0+local`` are rejected because PyPI does
 not accept them. Development and prerelease versions, such as ``0.2.0rc1``,
 publish to PyPI and create a GitHub **prerelease**. Post releases are ordinary
 GitHub releases.
 
 After PyPI succeeds, the workflow creates a GitHub release for the existing tag
-with generated release notes and attaches the wheel, source distribution, and
+using only the matching changelog section's body as its release notes, and attaches
+the wheel, source distribution, and
 ``provenance.json`` verification bundle. Existing releases and files are never
 overwritten. Runs for the same tag are serialized without cancellation.
+The Unreleased section, other versions, and the version/date heading are excluded
+from the release body. Notes are downloaded as a separate workflow artifact;
+the privileged release job does not check out or run project code. Existing
+tags and published releases are not rewritten when the changelog changes.
 
 Verify provenance and recover failures
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

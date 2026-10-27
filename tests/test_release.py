@@ -104,13 +104,125 @@ def test_release_validates_sdist_metadata_independently(release, tmp_path, kind)
 
 
 @pytest.mark.parametrize(
-    ("version", "prerelease"), [("1.2.3", "false"), ("1.2.3rc1", "true"), ("1.2.3.dev1", "true")]
+    ("version", "prerelease"),
+    [("1.2.3", "false"), ("1.2.3rc1", "true"), ("1.2.3.dev1", "true"), ("1.2.3.post1", "false")],
 )
 def test_release_outputs_safe_workflow_metadata(release, tmp_path, capsys, version, prerelease):
     project = tmp_path / "pyproject.toml"
     project.write_text(f'[project]\nname = "sample-tools"\nversion = "{version}"\n')
-    assert release.main([f"v{version}", "--project", str(project)]) == 0
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(
+        f"# Changelog\n\n## [{version}] - 2000-02-29\n\n### Added\n\n- New tool.\n"
+    )
+    notes = tmp_path / "release-notes.md"
+    args = ["--project", str(project), "--changelog", str(changelog)]
+    assert release.main([f"v{version}", *args, "--notes-output", str(notes)]) == 0
     assert capsys.readouterr().out == f"version={version}\nprerelease={prerelease}\n"
-    assert release.main(["v9.9.9", "--project", str(project)]) == 1
+    assert notes.read_text() == "### Added\n\n- New tool.\n"
+    assert release.main(["v9.9.9", *args]) == 1
     captured = capsys.readouterr()
     assert not captured.out and "Release validation failed" in captured.err
+
+
+def test_release_notes_preserve_only_selected_markdown_section(release):
+    text = """# Changelog
+
+## [Unreleased]
+
+- Future work.
+
+## [1.2.3] - 2000-02-29
+
+### Added
+
+- Read the [manual](https://example.invalid/manual).
+  Keep **formatting** and indentation.
+
+```markdown
+## [1.2.3] - not a release heading
+```
+
+## [1.2.2] - 2000-01-01
+
+- Older work.
+"""
+    notes = release.release_notes(text, release.Version("1.2.3"))
+    assert notes == (
+        "### Added\n\n- Read the [manual](https://example.invalid/manual).\n"
+        "  Keep **formatting** and indentation.\n\n"
+        "```markdown\n## [1.2.3] - not a release heading\n```\n"
+    )
+    assert "Future work" not in notes and "Older work" not in notes
+    assert release.release_notes(text, release.Version("1.2.2")) == "- Older work.\n"
+
+
+@pytest.mark.parametrize(
+    ("text", "error"),
+    [
+        ("## [Unreleased]\n- Future work.\n", "exactly one"),
+        ("## [1.2.30] - 2000-01-01\n- Other version.\n", "exactly one"),
+        ("## [1.2.3] - 2000-01-01\n- A.\n## [1.2.3] - 2000-01-02\n- B.\n", "exactly one"),
+        ("## [1.2.3]\n- Missing date.\n", "release date"),
+        ("## [1.2.3] - 20000101\n- Wrong date format.\n", "release date"),
+        ("## [1.2.3] - 2001-02-29\n- Impossible date.\n", "day"),
+        ("## [1.2.3] - 2000-13-01\n- Impossible month.\n", "month"),
+        ("## [1.2.3] - 2000-01-01\n", "substantive"),
+        ("## [1.2.3] - 2000-01-01\n\n### Added\n\n-\n<!-- TODO -->\n", "substantive"),
+        ("## [1.2.3] - 2000-01-01\n[manual]: https://example.invalid\n", "substantive"),
+        ("## [1.2.3] - 2000-01-01\n```\n- Unclosed example.\n", "Unclosed"),
+    ],
+)
+def test_release_notes_reject_invalid_entries(release, text, error):
+    with pytest.raises(ValueError, match=error):
+        release.release_notes(text, release.Version("1.2.3"))
+
+
+def test_invalid_changelog_does_not_emit_metadata_or_create_notes(release, tmp_path, capsys):
+    project = tmp_path / "pyproject.toml"
+    project.write_text('[project]\nname = "sample-tools"\nversion = "1.2.3"\n')
+    changelog = tmp_path / "CHANGELOG.md"
+    output = tmp_path / "release-notes.md"
+    args = [
+        "v1.2.3",
+        "--project",
+        str(project),
+        "--changelog",
+        str(changelog),
+        "--notes-output",
+        str(output),
+    ]
+    assert release.main(args) == 1  # Missing changelog.
+    assert not output.exists() and not capsys.readouterr().out
+    changelog.write_text("## [Unreleased]\n\n- Future work.\n")
+    assert release.main(args) == 1
+    captured = capsys.readouterr()
+    assert not output.exists() and not captured.out and "exactly one" in captured.err
+
+
+def test_notes_output_stays_separate_from_checked_distributions(release, tmp_path, capsys):
+    project = tmp_path / "pyproject.toml"
+    project.write_text('[project]\nname = "sample-tools"\nversion = "1.2.3"\n')
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text("## [1.2.3] - 2000-01-01\n\n- Synthetic release.\n")
+    directory = tmp_path / "dist"
+    directory.mkdir()
+    distributions(directory)
+    output = tmp_path / "release-notes.md"
+    assert (
+        release.main(
+            [
+                "v1.2.3",
+                "--project",
+                str(project),
+                "--changelog",
+                str(changelog),
+                "--dist",
+                str(directory),
+                "--notes-output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    assert len(list(directory.iterdir())) == 2 and output.is_file()
+    assert capsys.readouterr().out == "version=1.2.3\nprerelease=false\n"

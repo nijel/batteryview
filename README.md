@@ -33,6 +33,8 @@ Use [battery doctor](https://pylontech-tools.readthedocs.io/en/latest/software/d
 for read-only health screening online or from saved logs.
 
 Browse the [online documentation](https://pylontech-tools.readthedocs.io/en/latest/).
+See the [changelog](https://github.com/nijel/pylontech-tools/blob/main/CHANGELOG.md)
+for release notes and unreleased changes.
 
 - [Python library and CLI](https://pylontech-tools.readthedocs.io/en/latest/software/index.html): installation, reports,
   support collection, monitoring, SOC reset, API, and troubleshooting.

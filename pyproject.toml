@@ -37,6 +37,7 @@ include = [
     "/scripts/check_release.py",
     "/.github/workflows/*.yml",
     "/README.md",
+    "/CHANGELOG.md",
     "/LICENSE",
     "/pyproject.toml",
     "/uv.lock",

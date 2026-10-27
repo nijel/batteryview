@@ -52,6 +52,12 @@ motivation; mark breaking changes explicitly. Add `Fixes #123` when resolving an
 issue. PR descriptions should explain the problem, resulting behavior, validation,
 and firmware-specific limitations.
 
+Update `CHANGELOG.md` under `Unreleased` for user-visible or compatibility changes
+and significant documentation/development changes. Use concise entries under the
+applicable Added, Changed, Fixed, Removed, or Security heading; routine internal
+cleanup needs no entry. Before releasing, move entries into a dated version
+section and retain an empty Unreleased section. Never include private log data.
+
 ## Documentation Guidelines
 
 Document user-visible changes alongside code. Use direct instructional prose,
