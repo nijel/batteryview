@@ -55,17 +55,11 @@ scripts are outside this first implementation.
 Publishing releases
 -------------------
 
-Pushing a tag such as ``v0.1.0`` runs ``.github/workflows/release.yml``. The tag
-must match the exact version in ``pyproject.toml``, prefixed with ``v``. Releases
-wait for the reusable test workflow's full platform/Python matrix and the strict
-documentation build. Branch pushes and pull requests run those checks without
-publishing.
-
-The workflow builds one wheel and source distribution with locked release tools,
-checks their identities and metadata, and smoke-tests the installed wheel outside
-the checkout. Separate jobs attest and publish these same files. No project code
-is checked out or executed in the PyPI publishing job. Distributions and the
-provenance bundle are retained as workflow artifacts for 30 days.
+Pushing a version tag runs ``.github/workflows/release.yml``. GitHub Actions runs
+the tests and documentation checks, builds and validates the distributions,
+generates provenance, publishes to PyPI, and creates a GitHub release using the
+matching changelog entry. The wheel, source distribution, and provenance bundle
+are attached to the release. Workflow artifacts are retained for 30 days.
 
 Configure trusted publishing once
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,63 +91,57 @@ password. See PyPI's `trusted publishing guide
 Create a release
 ~~~~~~~~~~~~~~~~
 
-Record user-visible changes under ``Unreleased`` in the repository's
-`CHANGELOG.md <https://github.com/nijel/pylontech-tools/blob/main/CHANGELOG.md>`__.
-Use concise entries under the applicable Added, Changed, Fixed, Removed, or
-Security headings. Significant documentation and development changes belong
-there too; routine internal cleanup does not require an entry.
+1. Move the relevant entries from ``Unreleased`` in
+   `CHANGELOG.md <https://github.com/nijel/pylontech-tools/blob/main/CHANGELOG.md>`__
+   into a section named ``## [VERSION] - YYYY-MM-DD``. Use the release date,
+   retain an empty ``## [Unreleased]`` section, and use inline Markdown links
+   so the release notes remain self-contained.
+2. Set the same version in ``pyproject.toml`` and update ``uv.lock`` with
+   ``uv lock``. The tag must be that exact version prefixed with ``v``.
+3. Commit and push the changes, then create and push the tag. For example,
+   after preparing version ``0.2.0``:
 
-Before releasing, move the relevant entries into a section named
-``## [VERSION] - YYYY-MM-DD``, using the exact project version and release date.
-Retain an empty ``## [Unreleased]`` section for subsequent changes. Use inline
-Markdown links so that the extracted notes remain self-contained.
+   .. code-block:: sh
 
-Update the static project version and lockfile, commit the changes, then tag that
-commit. For example, after preparing a dated ``[0.2.0]`` changelog section and
-setting the project version to ``0.2.0``:
+      git add CHANGELOG.md pyproject.toml uv.lock
+      git commit -m "chore: prepare 0.2.0 release" -m "Finalize release notes and package version."
+      git push origin HEAD
+      git tag -a v0.2.0 -m "Release 0.2.0"
+      git push origin v0.2.0
 
-.. code-block:: sh
+4. Follow the Release workflow in GitHub Actions and confirm that both PyPI
+   publication and the GitHub release succeed.
 
-   uv lock
-   uv sync --locked --group release
-   uv run --locked --group release python scripts/check_release.py v0.2.0 --notes-output release-notes.md
-   uv build --no-build-isolation --no-create-gitignore
-   uv run --locked --group release python scripts/check_release.py v0.2.0 --dist dist
-   uv run --locked --group release twine check --strict dist/*
-   git tag -a v0.2.0 -m "Release 0.2.0"
-   git push origin v0.2.0
+Actions rejects missing, duplicate, empty, or incorrectly dated changelog entries
+before publishing. Development and prerelease versions such as ``0.2.0rc1``
+create GitHub prereleases. No local build or manual upload is required.
 
-Use a clean ``dist/`` directory for these local checks. Do not commit build
-artifacts or the extracted ``release-notes.md``. The release workflow creates
-them independently from the tagged commit, with notes outside ``dist/``.
-Validation requires exactly one matching, dated changelog section with
-substantive notes, and fails before building or publishing if it is missing,
-duplicated, empty, or has an invalid date.
-Local version identifiers such as ``0.1.0+local`` are rejected because PyPI does
-not accept them. Development and prerelease versions, such as ``0.2.0rc1``,
-publish to PyPI and create a GitHub **prerelease**. Post releases are ordinary
-GitHub releases.
+.. _verify-provenance-and-recover-failures:
 
-After PyPI succeeds, the workflow creates a GitHub release for the existing tag
-using only the matching changelog section's body as its release notes, and attaches
-the wheel, source distribution, and
-``provenance.json`` verification bundle. Existing releases and files are never
-overwritten. Runs for the same tag are serialized without cancellation.
-The Unreleased section, other versions, and the version/date heading are excluded
-from the release body. Notes are downloaded as a separate workflow artifact;
-the privileged release job does not check out or run project code. Existing
-tags and published releases are not rewritten when the changelog changes.
+Recover failures
+~~~~~~~~~~~~~~~~
 
-Verify provenance and recover failures
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If validation or authentication fails before upload, fix the underlying issue
+and rerun failed jobs where possible. A code or version change requires a new
+commit/tag; do not move a published tag.
 
-GitHub's ``actions/attest`` generates SLSA build provenance for both distributions.
-The publishing action separately generates and uploads PyPI publish attestations
-using the trusted publisher identity. These establish origin and artifact
-digests; they are not a guarantee that the software is free of defects.
+If PyPI succeeded and only the GitHub release job failed, use **Re-run failed
+jobs** so PyPI is not uploaded again. If asset uploads left a draft release,
+complete it from the original workflow artifacts before publishing. Published
+immutable release assets cannot be replaced.
 
-Download the release assets into ``dist/``, then verify each distribution using
-the GitHub CLI:
+If PyPI accepted only some files, or publication status is ambiguous, inspect its
+files and attestations before retrying. The workflow does not skip existing
+files, so duplicates fail. Preserve the original artifacts and resolve the
+partial publication manually or issue a new version. Never rebuild and replace
+an already-published distribution.
+
+Verifying downloaded artifacts
+------------------------------
+
+Release distributions have GitHub build-provenance attestations and PyPI publish
+attestations. To check the origin and digests of downloaded GitHub release assets,
+save them in ``dist/`` and verify each distribution with the GitHub CLI:
 
 .. code-block:: sh
 
@@ -165,20 +153,6 @@ The attached bundle can also be passed using ``--bundle dist/provenance.json``.
 See `GitHub attestation verification
 <https://cli.github.com/manual/gh_attestation_verify>`__ and `PyPI package
 provenance <https://docs.pypi.org/attestations/consuming-attestations/>`__.
-
-If validation or authentication fails before upload, fix the underlying issue
-and rerun failed jobs where possible. A code or version change requires a new
-commit/tag; do not move a published tag. If PyPI completed successfully and only
-the GitHub release job failed, use **Re-run failed jobs** so PyPI is not uploaded
-again. If a GitHub release already exists after a partial asset upload, inspect
-its assets and complete it from the original workflow artifacts without replacing
-existing files.
-
-If PyPI accepted only some files, or publication status is ambiguous, inspect the
-PyPI files and attestations before retrying. The workflow intentionally does not
-skip existing files: an ordinary retry will fail on duplicates. Preserve the
-original artifacts; resolve a partial publication manually or issue a new version
-if necessary. Never rebuild and replace an already-published distribution.
 
 Building the documentation
 --------------------------

@@ -19,6 +19,8 @@ grouped below; dated version sections provide the GitHub release notes.
 - Recommend `uvx` for occasional CLI use and `uv tool install` for regular use, with
   PyPI installation and upgrade instructions for library users.
 - Build release distributions and documentation in CI with Python 3.15.
+- Simplify maintainer release instructions around GitHub Actions, with separate
+  guidance for verifying downloaded artifacts.
 
 ## [0.1.0] - 2026-10-26
 
