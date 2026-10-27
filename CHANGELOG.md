@@ -7,6 +7,10 @@ grouped below; dated version sections provide the GitHub release notes.
 
 ### Added
 
+- Gather capacity bookkeeping, control/protection status, usage metrics, voltage
+  extrema, and existing diagnostic reads with one read-only `diagnostics` command.
+  Unsupported commands, including unavailable `soh`, are skipped; text and JSON
+  output retain successful evidence and partial acquisition failures.
 - Maintain a curated changelog and use each version's entry for GitHub release notes.
 - Automate dependency updates with Renovate.
 

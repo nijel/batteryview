@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TextIO
 
 from . import BatteryClient, CommandCancelled, PylontechError, Snapshot
+from .diagnostic_reads import format_diagnostics
 from .diagnostics import configure_logging, failure_diagnostic
 from .doctor import analyze_logs, format_doctor
 from .profiles import PROFILES
@@ -114,6 +115,7 @@ def parser() -> argparse.ArgumentParser:
         ("time", "read the battery clock without setting it"),
         ("log", "read the diagnostic log without clearing it"),
         ("config", "display configuration without changing it"),
+        ("diagnostics", "gather read-only diagnostics, skipping unsupported commands"),
         ("snapshot", "read module and cell measurements"),
         ("watch", "stream module and cell measurements"),
         ("history", "save a BatteryView-compatible History transcript"),
@@ -151,7 +153,7 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument(
                 "--output", type=Path, help="new transcript path; never overwritten"
             )
-        elif name in {"stat", "time", "log", "config"}:
+        elif name in {"stat", "time", "log", "config", "diagnostics"}:
             command.add_argument("--format", choices=["text", "json"], default="text")
             command.add_argument("--output", type=Path, help="new output file (default: stdout)")
             if name == "log":
@@ -284,7 +286,23 @@ def _run(args: argparse.Namespace) -> int:
                 args.output.open("x", encoding="utf-8", newline="") if args.output else sys.stdout
             )
             try:
-                if args.command in {"stat", "time", "log", "config"}:
+                if args.command == "diagnostics":
+                    result = client.diagnostics()
+                    output.write(
+                        format_diagnostics(result)
+                        if args.format == "text"
+                        else json.dumps(asdict(result), ensure_ascii=False) + "\n"
+                    )
+                    output.flush()
+                    if not result.complete:
+                        failure = client.last_failure
+                        message = str(failure) if failure else "no supported diagnostic reads"
+                        print(f"Diagnostics incomplete: {message}", file=sys.stderr)
+                        detail = failure_diagnostic(failure)
+                        if detail:
+                            print(detail, file=sys.stderr)
+                    return 0 if result.complete else 1
+                elif args.command in {"stat", "time", "log", "config"}:
                     if args.command == "log":
                         result = client.diagnostic_log(args.count)
                     else:

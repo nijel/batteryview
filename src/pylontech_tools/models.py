@@ -121,6 +121,27 @@ class ConsoleReadResult:
 
 
 @dataclass(frozen=True)
+class DiagnosticReadResult:
+    """One combined diagnostic read: complete, unavailable, or failed."""
+
+    command: str
+    status: str
+    text: str = ""
+    fields: dict[str, str] = field(default_factory=dict)
+    error: dict[str, str] | None = None
+    context: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DiagnosticsReport:
+    """Ordered read-only diagnostic evidence; unavailable reads are optional."""
+
+    timestamp: str
+    complete: bool
+    reads: list[DiagnosticReadResult]
+
+
+@dataclass(frozen=True)
 class DoctorFinding:
     """A screening finding supported by named input observations."""
 

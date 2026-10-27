@@ -47,6 +47,68 @@ that accepts that level. The library installs no output handlers or root-logger 
 Read-only battery diagnostics
 -----------------------------
 
+Use ``diagnostics`` to gather the available diagnostic reads in one session:
+
+.. code-block:: sh
+
+   pylontech-console diagnostics --port /dev/ttyUSB0
+   pylontech-console diagnostics --port COM3 --format json --output diagnostics.json
+
+It sends these exact bare commands in order: ``stat``, ``time``, ``log``,
+``config``, ``totalcoul``, ``tcycle``, ``emptyvolt``, ``setlowcfg``, ``ctrl``,
+``prot``, ``euro``, ``trdagevolt``, and ``soh``. No setter operands or target
+selectors are accepted. A direct connection is required; ``--module`` is not
+available. In particular, bare ``euro`` avoids the documented E2 addressed-form
+bug, and bare ``ctrl`` avoids target-specific forms that can change state.
+
+The additional reads report nominal capacity and cycle/effective-capacity
+bookkeeping, empty-voltage and low-SOC settings, control/protection states,
+extended usage metrics, stored voltage extrema, and per-cell SOH diagnostic
+counters/states. ``soh`` does not report measured per-cell health percentages.
+Firmware-derived capacity and resistance metrics are estimates, not capacity
+test results. See :doc:`/protocol/health` and :doc:`/protocol/diagnostics` for
+interpretation and firmware limitations.
+
+An explicitly unsupported command is marked ``unavailable`` and acquisition
+continues. This includes ``soh`` on firmware where it cannot be invoked. Other
+errors, including busy or absent targets, timeouts, and malformed responses,
+stop subsequent reads. Completed responses and the failed response/context
+remain in the partial report; stderr shows the failure diagnostics.
+
+Text output separates commands into sections and uses short unavailable notices,
+without truncating successful responses. JSON contains ``timestamp`` (UTC),
+``complete``, and ordered ``reads``. Each read has ``command``, ``status``
+(``complete``, ``unavailable``, or ``failed``), original ``text``, string-valued
+``fields``, optional ``error`` type/message, and failure ``context``. Units are
+not converted. Unsupported responses remain available in JSON.
+
+Exit status is **0** if acquisition finishes with at least one successful read,
+even when other commands are unavailable; **1** if a read fails or every command
+is unavailable; **130** on interruption. Interruption propagates normally and
+does not produce a completed combined report. Normal disconnect cleanup still
+runs. ``--output`` creates a new UTF-8 file and never overwrites an existing one.
+The existing logging and bounded ``--read-retries`` options apply. Default
+``collect`` and doctor acquisition are unchanged.
+
+Python callers use :meth:`~pylontech_tools.BatteryClient.diagnostics`:
+
+.. code-block:: python
+
+   from pylontech_tools import BatteryClient
+
+   with BatteryClient("/dev/ttyUSB0") as battery:
+       report = battery.diagnostics()
+       for read in report.reads:
+           print(read.command, read.status, read.fields)
+       if not report.complete:
+           print(battery.last_failure)
+
+An ordinary acquisition failure returns an incomplete report and retains its
+exception in ``last_failure``. Cancellation raises instead of returning a report.
+
+Individual reads
+~~~~~~~~~~~~~~~~
+
 These explicit reads display information without setting the clock, changing
 configuration, or clearing counters or logs:
 

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .collection import collect
+from .diagnostic_reads import read_diagnostics
 from .diagnostics import command_label
 from .errors import (
     CommandTimeout,
@@ -25,6 +26,7 @@ from .models import (
     CollectionResult,
     ConsoleReadResult,
     DeviceInfo,
+    DiagnosticsReport,
     DoctorReport,
     ModuleReading,
     ReportResult,
@@ -164,6 +166,14 @@ class BatteryClient:
     def configuration(self) -> ConsoleReadResult:
         """Display the complete configuration without supplying setter operands."""
         return self._diagnostic_read(f"config {self.module}" if self.module else "config")
+
+    def diagnostics(self) -> DiagnosticsReport:
+        """Gather local read-only diagnostics, skipping unsupported commands.
+
+        Other read failures stop acquisition and return an incomplete report;
+        last_failure retains the exception. Cancellation propagates normally.
+        """
+        return read_diagnostics(self)
 
     def doctor(
         self, *, save_inputs: str | Path | None = None, imbalance_mv: int = 100

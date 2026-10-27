@@ -41,6 +41,14 @@ names; absent measurements are ``None``. Results retain raw console data.
    :members:
    :undoc-members:
 
+.. autoclass:: pylontech_tools.DiagnosticReadResult
+   :members:
+   :undoc-members:
+
+.. autoclass:: pylontech_tools.DiagnosticsReport
+   :members:
+   :undoc-members:
+
 .. autoclass:: pylontech_tools.ModuleReading
    :members:
    :undoc-members:

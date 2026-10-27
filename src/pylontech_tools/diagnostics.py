@@ -33,6 +33,14 @@ def command_label(command: str) -> str:
         "setlowcfg",
         "tbar",
         "cmdquit",
+        "totalcoul",
+        "tcycle",
+        "emptyvolt",
+        "ctrl",
+        "prot",
+        "euro",
+        "trdagevolt",
+        "soh",
     }
     if parts[0] not in known:
         return "<command>"
